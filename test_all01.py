@@ -2,11 +2,9 @@ import torch
 from ClassAmoeba import Amoeba
 from ClassModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
 from ClassSearchEngine import SearchEngine
-# from ClassGamePlay import GamePLay
-# from ClassEvaluator import EvaluationBuffer
+# TODO: from ClassEvaluator import EvaluationBuffer
 # from torchinfo import summary
 # from line_profiler_pycharm import profile
-# from ClassTree import Tree
 # import time
 
 # Collect parameters in a dictionary
@@ -17,22 +15,21 @@ args = {
     # 'CUDA_device': 'cpu',
     # 'num_leaf': 8,
     # 'num_branch': 2,
-    'num_MC': 500,
+    'num_MC': 400,
     'num_child': 40,
-    'num_table': 200,
-    'num_agent': 700,
+    'num_table': 250,
+    'num_agent': 800,
     # 'num_moves': 5,
-    'leaf_buffer_size': 2000,
+    'leaf_buffer_size': 5000,
     'eval_batch_size': 800,
-    'res_channels': 64,
-    'hid_channels': 32,
-    'num_res': 8,
-    'policy_hid_channels': 64,
-    'value_hid_dim': 128
+    'res_channels': 32,
+    'hid_channels': 16,
+    'num_res': 4,
+    'policy_hid_channels': 32,
+    'value_hid_dim': 64
 }
 
 game = Amoeba(args)
-
 terminal_check = TerminalCheck01(args)
 # model = TrivialModel01(args)
 # model = TrivialModel02(args)
@@ -42,10 +39,11 @@ model.eval()
 engine = SearchEngine(args, game, terminal_check, model)
 
 player = -torch.ones(args.get('num_table'), dtype=torch.int32)
-position = game.get_random_positions(n_state=args.get('num_table'), n_plus=1, n_minus=0)
+position = game.get_random_positions(n_state=args.get('num_table'), n_plus=10, n_minus=10)
 table = torch.arange(args.get('num_table'))
 
-for i in range(10):
+# Let us monitor a little bit of gameplay ...
+for i in range(5):
     print(i)
     game.print_board(position[0])
     move_policy, position_value = engine.analyze(player, position)

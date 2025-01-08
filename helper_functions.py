@@ -3,7 +3,7 @@ from line_profiler_pycharm import profile
 
 
 @profile
-def unique(x, dim=None):
+def helper_unique(x, dim=None):
     """Unique elements of x and indices of those unique elements
     https://github.com/pytorch/pytorch/issues/36748#issuecomment-619514810
 
@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     # Combine `tables` and `nodes` into a single tensor of shape (N, 2)
     combined = torch.stack([tables, nodes], dim=1)  # Shape: (N, 2)
-    unique_combined, count, unique_indices = unique(combined, dim=0)
+    unique_combined, count, unique_indices = helper_unique(combined, dim=0)
 
     # Use these indices to select unique values
     unique_values = values[unique_indices]

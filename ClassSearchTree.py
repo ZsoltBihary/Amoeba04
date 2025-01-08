@@ -1,8 +1,4 @@
 import torch
-# import torch.nn as nn
-# import torch.nn.functional as F
-# from typing import Tuple
-# from ClassBufferManager import BufferManager
 from helper_functions import duplicate_indices
 from line_profiler_pycharm import profile
 
@@ -13,16 +9,13 @@ class SearchTree:
         self.num_child = num_child
         self.num_node = num_node
         # Set up tree attributes
-        # self.next_node = 2 * torch.ones(self.num_table, dtype=torch.long)
         self.next_node = torch.zeros(self.num_table, dtype=torch.long)
         self.is_leaf = torch.zeros((self.num_table, self.num_node), dtype=torch.bool)
         self.is_terminal = torch.zeros((self.num_table, self.num_node), dtype=torch.bool)
-        # self.player = torch.ones((self.num_table, self.num_node), dtype=torch.int32)
         self.count = torch.zeros((self.num_table, self.num_node), dtype=torch.int32)
         self.value_sum = torch.zeros((self.num_table, self.num_node), dtype=torch.float32)
         self.value = torch.zeros((self.num_table, self.num_node), dtype=torch.float32)
         self.start_child = torch.zeros((self.num_table, self.num_node), dtype=torch.long)
-        # self.parent = torch.ones((self.num_table, self.num_node), dtype=torch.long)
         self.action = torch.zeros((self.num_table, self.num_node), dtype=torch.long)
         self.prior = torch.zeros((self.num_table, self.num_node), dtype=torch.float32)
         self.ucb = torch.zeros((self.num_table, self.num_node), dtype=torch.float32)
@@ -32,32 +25,18 @@ class SearchTree:
         return f"MyClass(next_node={self.next_node.tolist()}, start_child={self.start_child[:, :20].tolist()})"
 
     def reset(self):
-        # self.next_node[:] = 2
         self.next_node[:] = 2
         self.is_leaf[:, :] = True
-        # TODO: just for testing ... begin
-        # self.is_leaf[:, 1] = False
-        # TODO: just for testing ... end
         self.is_terminal[:, :] = False
-        # self.player[:, :] = 0
         self.count[:, :] = 0
         self.value_sum[:, :] = 0.0
-        # self.value[:, :] = 0.0
-        # self.start_child[:, :] = 2
-        # self.start_child[:, :] = 0
-        # self.parent[:, :] = 1
-        # self.action[:, :] = 0
-        # self.prior[:, :] = 0.0
-        # self.ucb[:, :] = -9999.9
         return
 
     def get_children(self, parent_table, parent_node):
-        # child_table = parent_table.unsqueeze(1).repeat(1, self.num_child)
-        # Add the start index to the offsets to get the actual indices ... relying on broadcasting here ...
+        # Add the start index to the offsets to get the actual indices ...
         start_node = self.start_child[parent_table, parent_node].reshape(-1, 1)
         node_offset = torch.arange(self.num_child, dtype=torch.long).reshape(1, -1)
         child_node = start_node + node_offset
-        # return child_table, child_node, node_offset
         return child_node
 
     def calc_priors(self, logit):
@@ -101,30 +80,15 @@ class SearchTree:
         self.value[table, node] = self.value_sum[table, node] / self.count[table, node]
         return
 
+    @profile
     def update_ucb(self, table, parent, child, parent_player):
         child_q = self.value[table, child]
         child_prior = self.prior[table, child]
         parent_count = self.count[table, parent]
         child_count = self.count[table, child]
-        # self.ucb[table, child] = (parent_player * child_q +
-        #                           2.0 * child_prior * torch.sqrt(parent_count + 1) / (child_count + 1))
-        #
-        # ucb_value = (parent_player * child_q +
-        #                           2.0 * child_prior * torch.sqrt(parent_count + 1) / (child_count + 1))
-
-        # # Calculate UCB normally
-        # ucb_values = (parent_player * child_q +
-        #               2.0 * child_prior * torch.sqrt(parent_count + 1) / (child_count + 1))
-        #
-        # # Assign a very low value where child_prior < 0.001
-        # self.ucb[table, child] = torch.where(child_prior < 0.001,
-        #                                      -9999.9,
-        #                                      ucb_values)
-
         # Assign a very low value where child_prior < 0.001
         self.ucb[table, child] = torch.where(child_prior < 0.001,
                                              -9999.9,
                                              (parent_player * child_q +
                                               2.0 * child_prior * torch.sqrt(parent_count + 1) / (child_count + 1)))
-
         return

@@ -16,7 +16,7 @@ class SearchEngine:
         self.terminal_check = terminal_check
         self.model = model
 
-        # self.evaluator = evaluator
+        # TODO: self.evaluator = evaluator
 
         # Set up parameters
         self.num_table = args.get('num_table')
@@ -94,7 +94,6 @@ class SearchEngine:
     def activate_agents(self):
         passive_agents = self.all_agents[~self.active]
         num_new = min(self.num_table, passive_agents.shape[0])
-        # TODO: This is just a proxy for now ... max 1 agent / table
         new_tables = self.table_order[: num_new]
         new_agents = passive_agents[: num_new]
         self.active[new_agents] = True
@@ -108,7 +107,7 @@ class SearchEngine:
         return
 
     @profile
-    def save_children(self, table, parent_node, child_node, parent_player, collect):
+    def save_children(self, table, parent_node, child_node, parent_player):
         # Step 1: Replicate table, parent_node and parent_player to 2d shape
         table_expanded = table.unsqueeze(1).repeat(1, self.num_child)
         parent_node_expanded = parent_node.unsqueeze(1).repeat(1, self.num_child)
@@ -118,7 +117,7 @@ class SearchEngine:
         parents = parent_node_expanded.flatten()
         children = child_node.flatten()
         players = parent_player_expanded.flatten()
-        self.buffer_mgr.add_children(tables, parents, children, players, collect)
+        self.buffer_mgr.add_children(tables, parents, children, players)
         return
 
     def split_agents(self, agent, table, child_node, depth_max):
@@ -162,7 +161,7 @@ class SearchEngine:
         self.av_num_agent = self.av_num_agent * 0.9 + n_agent * 0.1
         child_node = self.tree.get_children(table, parent_node)
         # Save all the child information to the child buffer, we will use this info to update ucb ...
-        self.save_children(table, parent_node, child_node, self.player[agent], collect=True)
+        self.save_children(table, parent_node, child_node, self.player[agent])
         # Find the best child node based on current ucb ...
         ucb_tensor = self.tree.ucb[table.view(-1, 1), child_node]
         best_idx = torch.argmax(ucb_tensor, dim=1)
@@ -174,80 +173,6 @@ class SearchEngine:
         # self.split_agents(agent, table, child_node, depth_max=4)
         # self.split_agents(agent, table, child_node, depth_max=6)
         # self.split_agents(agent, table, child_node, depth_max=10)
-
-        # # Let us do some branching if num_table = 1 ...
-        # if self.num_table == 1:
-        #
-        #     passive_agent = self.all_agents[~self.active]
-        #     if passive_agent.shape[0] >= agent.shape[0]:
-        #         agent2 = passive_agent[: agent.shape[0]]
-        #         self.active[agent2] = True
-        #         self.table[agent2] = 0
-        #
-        #         ucb_tensor = self.tree.ucb[table.view(-1, 1), child_node]
-        #         best_idx = torch.argmax(ucb_tensor, dim=1)
-        #         new_node2 = child_node[torch.arange(best_idx.shape[0]), best_idx]
-        #         # Lower ucb for best child to facilitate branching for consecutive paths ...
-        #         self.tree.ucb[table, new_node2] -= self.branch_penalty
-        #
-        #         self.node[agent2] = new_node2
-        #         # TODO: Make this general, based on the Amoeba class ...
-        #         new_action = self.tree.action[table, new_node2]
-        #         self.position[agent2, :] = self.position[agent, :]
-        #         self.position[agent2, new_action] = self.player[agent]
-        #         self.player[agent2] = -self.player[agent]
-        #         self.path[agent2, :] = self.path[agent, :]
-        #         self.path[agent2, self.depth[agent]] = new_node2
-        #         self.depth[agent2] = self.depth[agent] + 1
-        #
-        #         passive_agent = self.all_agents[~self.active]
-        #         if passive_agent.shape[0] >= agent.shape[0]:
-        #             agent2 = passive_agent[: agent.shape[0]]
-        #             self.active[agent2] = True
-        #             self.table[agent2] = 0
-        #
-        #             ucb_tensor = self.tree.ucb[table.view(-1, 1), child_node]
-        #             best_idx = torch.argmax(ucb_tensor, dim=1)
-        #             new_node2 = child_node[torch.arange(best_idx.shape[0]), best_idx]
-        #             # Lower ucb for best child to facilitate branching for consecutive paths ...
-        #             self.tree.ucb[table, new_node2] -= self.branch_penalty
-        #
-        #             self.node[agent2] = new_node2
-        #             # TODO: Make this general, based on the Amoeba class ...
-        #             new_action = self.tree.action[table, new_node2]
-        #             self.position[agent2, :] = self.position[agent, :]
-        #             self.position[agent2, new_action] = self.player[agent]
-        #             self.player[agent2] = -self.player[agent]
-        #             self.path[agent2, :] = self.path[agent, :]
-        #             self.path[agent2, self.depth[agent]] = new_node2
-        #             self.depth[agent2] = self.depth[agent] + 1
-        #
-        #             passive_agent = self.all_agents[~self.active]
-        #             if passive_agent.shape[0] >= agent.shape[0]:
-        #                 agent2 = passive_agent[: agent.shape[0]]
-        #                 self.active[agent2] = True
-        #                 self.table[agent2] = 0
-        #
-        #                 ucb_tensor = self.tree.ucb[table.view(-1, 1), child_node]
-        #                 best_idx = torch.argmax(ucb_tensor, dim=1)
-        #                 new_node2 = child_node[torch.arange(best_idx.shape[0]), best_idx]
-        #                 # Lower ucb for best child to facilitate branching for consecutive paths ...
-        #                 self.tree.ucb[table, new_node2] -= self.ucb_penalty
-        #
-        #                 self.node[agent2] = new_node2
-        #                 # TODO: Make this general, based on the Amoeba class ...
-        #                 new_action = self.tree.action[table, new_node2]
-        #                 self.position[agent2, :] = self.position[agent, :]
-        #                 self.position[agent2, new_action] = self.player[agent]
-        #                 self.player[agent2] = -self.player[agent]
-        #                 self.path[agent2, :] = self.path[agent, :]
-        #                 self.path[agent2, self.depth[agent]] = new_node2
-        #                 self.depth[agent2] = self.depth[agent] + 1
-        #             else:
-        #                 self.tree.ucb[table, new_node2] += (self.branch_penalty - self.ucb_penalty)
-        #
-        #         else:
-        #             self.tree.ucb[table, new_node2] += (self.branch_penalty - self.ucb_penalty)
 
         # Update agent attributes ...
         # self.tree.ucb[table, new_node] += (self.branch_penalty - self.ucb_penalty)
@@ -264,6 +189,7 @@ class SearchEngine:
     @profile
     def collect_leaves(self):
         self.table_order[:] = torch.argsort(self.tree.count[:, 1])
+        self.buffer_mgr.reset()
         while not self.buffer_mgr.batch_full:
             self.activate_agents()
             self.save_leaves()
@@ -273,24 +199,52 @@ class SearchEngine:
         self.buffer_mgr.post_process()
         return
 
+    # @profile
+    # def start_evaluation(self):
+    #     self.buffer_mgr.swap_buffers()
+    #     states = self.buffer_mgr.get_states()
+    #     states_CUDA = states.to(device=self.CUDA_device, dtype=torch.float32, non_blocking=True)
+    #     with torch.no_grad():
+    #         term_indicator_CUDA = self.terminal_check(states_CUDA)
+    #         result_CUDA = self.model(states_CUDA)
+    #     return term_indicator_CUDA, result_CUDA
+    #
+    # @profile
+    # def end_evaluation(self, term_indicator_CUDA, result_CUDA):
+    #     term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=False)
+    #     logit = result_CUDA[0].to(device='cpu', non_blocking=False)
+    #     value = result_CUDA[1].to(device='cpu', non_blocking=False)
+    #     # term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=True)
+    #     # logit = result_CUDA[0].to(device='cpu', non_blocking=True)
+    #     # value = result_CUDA[1].to(device='cpu', non_blocking=True)
+    #     # Interpret result ...
+    #     dir_max = term_indicator[:, 0]
+    #     dir_min = term_indicator[:, 1]
+    #     sum_abs = term_indicator[:, 2]
+    #     plus_mask = (dir_max + 0.1 > self.game.win_length)
+    #     minus_mask = (dir_min - 0.1 < -self.game.win_length)
+    #     draw_mask = (sum_abs + 0.1 > self.action_size)
+    #     value[draw_mask] = 0.0
+    #     value[plus_mask] = 1.05
+    #     value[minus_mask] = -1.05
+    #     # value = players * value
+    #     terminal_mask = plus_mask | minus_mask | draw_mask
+    #
+    #     self.buffer_mgr.add_eval_results(logit, value, terminal_mask)
+    #     return
+
     @profile
-    def start_evaluation(self):
-        self.buffer_mgr.swap_buffers()
+    def batch_evaluate(self):
+        # TODO: Structure with evaluator
         states = self.buffer_mgr.get_states()
         states_CUDA = states.to(device=self.CUDA_device, dtype=torch.float32, non_blocking=True)
         with torch.no_grad():
             term_indicator_CUDA = self.terminal_check(states_CUDA)
             result_CUDA = self.model(states_CUDA)
-        return term_indicator_CUDA, result_CUDA
 
-    @profile
-    def end_evaluation(self, term_indicator_CUDA, result_CUDA):
         term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=False)
         logit = result_CUDA[0].to(device='cpu', non_blocking=False)
         value = result_CUDA[1].to(device='cpu', non_blocking=False)
-        # term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=True)
-        # logit = result_CUDA[0].to(device='cpu', non_blocking=True)
-        # value = result_CUDA[1].to(device='cpu', non_blocking=True)
         # Interpret result ...
         dir_max = term_indicator[:, 0]
         dir_min = term_indicator[:, 1]
@@ -322,9 +276,10 @@ class SearchEngine:
         to_expand = ~is_term
         exp_table, exp_node = table[to_expand], node[to_expand]
         exp_player, exp_logit = player[to_expand], logit[to_expand]
-        exp_children = self.tree.expand(table[to_expand], node[to_expand], logit[to_expand])
+        # exp_children = self.tree.expand(table[to_expand], node[to_expand], logit[to_expand])
+        exp_children = self.tree.expand(exp_table, exp_node, exp_logit)
         # Save leaf_children data to the EVAL children buffer ...
-        self.save_children(exp_table, exp_node, exp_children, exp_player, False)
+        self.save_children(exp_table, exp_node, exp_children, exp_player)
         return
 
     @profile
@@ -349,26 +304,21 @@ class SearchEngine:
     @profile
     def analyze(self, player, position):
         self.reset(player, position)
-        # self.collect_leaves()
         while True:
-            # In the meantime, collect new leaf information ...
+            # Collect and evaluate new leaves ...
             self.collect_leaves()
-            # Send states to CUDA and start evaluation on GPU ...
-            term_indicator_CUDA, result_CUDA = self.start_evaluation()
-            # Send CUDA results back to CPU, and process results ...
-            self.end_evaluation(term_indicator_CUDA, result_CUDA)
+            self.batch_evaluate()
             # Update search tree ...
             self.expand_tree()
-            # print(self.tree)
             self.back_propagate()
             self.update_ucb()
-
+            # Monitor some quantities ... For testing ...
             min_MC = torch.min(self.tree.count[:, 1])
-            # print(min_MC.item())
-            # print(round(self.av_num_agent))
+            max_MC = torch.max(self.tree.count[:, 1])
+            print('minMC = ', min_MC.item(), ', maxMC = ', max_MC.item())
+            print(round(self.av_num_agent))
             if min_MC > self.num_MC:
                 break
-
         # Formulate output ...
         table = torch.arange(self.num_table)
         root = torch.ones(self.num_table, dtype=torch.long)
