@@ -171,30 +171,6 @@ class SimpleModel01(nn.Module):
         return policy_logit, value
 
 
-# class HeuristicModel01(nn.Module):
-#     def __init__(self, args: dict):
-#         super(HeuristicModel01, self).__init__()
-#         self.board_size = args.get('board_size')
-#         self.device = args.get('CUDA_device')
-#
-#         self.encoder = SimpleEncoder01(args)
-#
-#         # sum_kernel = 0.1 * torch.ones((1, 1, 3, 3), dtype=torch.float32)
-#         # self.sum_conv = CustomConvLayer(sum_kernel, 1)
-#         self.to(self.device)
-#
-#     @profile
-#     def forward(self, state_CUDA):
-#         board_type, line_type = self.interpret(state_CUDA)
-#         # x = state_CUDA.view(state_CUDA.shape[0], 1, self.board_size, self.board_size)
-#         # sum_abs_x = self.sum_conv(torch.abs(x)+0.2)
-#         # # logit head
-#         # logit = sum_abs_x.reshape(sum_abs_x.shape[0], -1)
-#         # # value head
-#         # value = torch.sum(state_CUDA, dim=1) * 0.0
-#         return board_type, line_type
-
-
 class CustomConvLayer(nn.Module):
     def __init__(self, kernel, padding):
         super(CustomConvLayer, self).__init__()

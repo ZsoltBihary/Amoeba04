@@ -17,11 +17,11 @@ args = {
     # 'num_branch': 2,
     'num_MC': 400,
     'num_child': 40,
-    'num_table': 250,
-    'num_agent': 800,
+    'num_table': 200,
+    'num_agent': 700,
     # 'num_moves': 5,
     'leaf_buffer_size': 5000,
-    'eval_batch_size': 800,
+    'eval_batch_size': 700,
     'res_channels': 32,
     'hid_channels': 16,
     'num_res': 4,
@@ -39,11 +39,11 @@ model.eval()
 engine = SearchEngine(args, game, terminal_check, model)
 
 player = -torch.ones(args.get('num_table'), dtype=torch.int32)
-position = game.get_random_positions(n_state=args.get('num_table'), n_plus=10, n_minus=10)
+position = game.get_random_positions(n_state=args.get('num_table'), n_plus=5, n_minus=5)
 table = torch.arange(args.get('num_table'))
 
 # Let us monitor a little bit of gameplay ...
-for i in range(5):
+for i in range(10):
     print(i)
     game.print_board(position[0])
     move_policy, position_value = engine.analyze(player, position)

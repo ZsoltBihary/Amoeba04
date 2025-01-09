@@ -2,7 +2,7 @@ import torch
 # import torch.nn as nn
 # import torch.nn.functional as F
 # from typing import Tuple
-from ClassBufferManager import BufferManager
+from ClassSearchBuffer import SearchBufferManager
 from ClassSearchTree import SearchTree
 # from ClassModel import evaluate01
 from line_profiler_pycharm import profile
@@ -29,12 +29,12 @@ class SearchEngine:
         self.CUDA_device = args.get('CUDA_device')
         # self.max_num_branch = args.get('num_branch')
         # self.num_branch = 1
-        # Set up buffer manager
-        self.buffer_mgr = BufferManager(leaf_buffer_size=args.get('leaf_buffer_size'),
-                                        child_buffer_size=args.get('leaf_buffer_size') * self.num_child * 2,
-                                        min_batch_size=args.get('eval_batch_size'),
-                                        action_size=self.action_size,
-                                        max_depth=self.max_depth)
+        # Set up search buffer manager
+        self.buffer_mgr = SearchBufferManager(leaf_buffer_size=args.get('leaf_buffer_size'),
+                                              child_buffer_size=args.get('leaf_buffer_size') * self.num_child * 2,
+                                              min_batch_size=args.get('eval_batch_size'),
+                                              action_size=self.action_size,
+                                              max_depth=self.max_depth)
         # Set up search tree
         self.tree = SearchTree(num_table=self.num_table,
                                num_node=self.num_node,
@@ -42,7 +42,7 @@ class SearchEngine:
         # Set up root attributes
         self.root_player = torch.zeros(self.num_table, dtype=torch.int32)
         self.root_position = torch.zeros((self.num_table, self.action_size), dtype=torch.int32)
-        # Set up search all_agents attributes
+        # Set up search agents attributes
         self.all_agents = torch.arange(self.num_agent)
         self.active = torch.zeros(self.num_agent, dtype=torch.bool)
         self.table = torch.zeros(self.num_agent, dtype=torch.long)
@@ -54,7 +54,6 @@ class SearchEngine:
         # Set up helper attributes
         self.table_order = torch.zeros(self.num_table, dtype=torch.long)
         self.ucb_penalty = 0.1
-        # self.branch_penalty = 0.05
         self.av_num_agent = 0.0
 
     def reset(self, root_player, root_position):
@@ -315,8 +314,8 @@ class SearchEngine:
             # Monitor some quantities ... For testing ...
             min_MC = torch.min(self.tree.count[:, 1])
             max_MC = torch.max(self.tree.count[:, 1])
-            print('minMC = ', min_MC.item(), ', maxMC = ', max_MC.item())
-            print(round(self.av_num_agent))
+            # print('minMC = ', min_MC.item(), ', maxMC = ', max_MC.item())
+            # print(round(self.av_num_agent))
             if min_MC > self.num_MC:
                 break
         # Formulate output ...

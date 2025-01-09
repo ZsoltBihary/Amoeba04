@@ -160,7 +160,7 @@ class ChildBuffer:
     #     return
 
 
-class BufferManager:
+class SearchBufferManager:
     def __init__(self, leaf_buffer_size, child_buffer_size, min_batch_size, action_size, max_depth):
 
         self.min_batch_size = min_batch_size
