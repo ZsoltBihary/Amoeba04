@@ -30,8 +30,9 @@ class PlayHistory:
 
     def add_data(self, players, positions, policies, values):
         self.player[self.all_table, self.next_move] = players
-        self.position[self.all_table, self.next_move] = positions
-        self.policy[self.all_table, self.next_move] = policies
+        self.position[self.all_table, self.next_move, :] = positions
+        self.policy[self.all_table, self.next_move, :] = policies
+        self.value[self.all_table, self.next_move] = values
         self.next_move[:] += 1
         return
 
@@ -44,15 +45,17 @@ class AlphaZero:
 
         # Set up parameters
         self.num_table = args.get('num_table')
-        # self.max_move = game.action_size + 1
+        self.max_move_idx = game.action_size + 1
         self.action_size = game.action_size
         # self.CUDA_device = args.get('CUDA_device')
-        self.num_moves = args.get('num_moves')
+        self.num_moves = args.get('num_moves')  # This is the total number of moves during the simulation
 
         self.search_engine = SearchEngine(args, game, evaluator)
         self.play_history = PlayHistory(self.num_table, self.action_size+1, self.action_size)
 
-        # self.next_move = torch.zeros(self.num_table, dtype=torch.long)
+        self.next_move_idx = torch.zeros(self.num_table, dtype=torch.long)
+        # TODO: Precalculate inverse temperatures ...
+        self.inverse_temp = torch.zeros(self.max_move_idx, dtype=torch.float32)
         self.all_table = torch.arange(self.num_table)
         self.player = torch.zeros(self.num_table, dtype=torch.int32)
         self.position = torch.zeros((self.num_table, self.action_size), dtype=torch.int32)
@@ -67,6 +70,7 @@ class AlphaZero:
         #   Could be different ...
         self.position[tables] = self.game.get_random_positions(n_state, n_plus=1, n_minus=1)
         self.player[tables] = 1
+        self.next_move_idx[:] = 0
         self.play_history.empty(tables)
         return
 
@@ -91,24 +95,32 @@ class AlphaZero:
 
         return
 
+    def make_move(self, move_policy):
+        # TODO: Currently, this is deterministic.
+        #   Make it probabilistic, using inverse temperature ...
+        move_action = torch.argmax(move_policy, dim=1)
+        self.position[self.all_table, move_action] = self.player
+        self.player *= -1
+        self.next_move_idx[:] += 1
+        return
+
     @profile
     def self_play(self):
         self.set_start_positions(self.all_table)
 
-        # Let us monitor a little bit of self-play ...
         for i in range(self.num_moves):
+
+            # Check EOG. For finished games save history to buffer, and restart ...
+            self.check_EOG()
+            # Analyze position with search engine ...
+            move_policy, position_value = self.search_engine.analyze(self.player, self.position)
+            # Save players, positions, policies and values to history ...
+            self.play_history.add_data(self.player, self.position, move_policy, position_value)
+            # TODO: TESTING!!! Let us monitor a little bit of self-play ...
             print(i)
             self.game.print_board(self.position[0])
-
-            self.check_EOG()
-
-            move_policy, position_value = self.search_engine.analyze(self.player, self.position)
-
             print("position value = ", position_value[0])
-            # print("move policy:\n", torch.round(100 * move_policy[0, :].view(game.board_size, -1)))
-            move_action = torch.argmax(move_policy, dim=1)
-            self.position[self.all_table, move_action] = self.player
-            self.player *= -1
-        self.game.print_board(self.position[0])
+            # Make move on all tables ...
+            self.make_move(move_policy)
 
         return
