@@ -2,7 +2,7 @@ import torch
 from ClassAmoeba import Amoeba
 from ClassModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
 from ClassSearchEngine import SearchEngine
-# TODO: from ClassEvaluator import EvaluationBuffer
+from ClassEvaluator import Evaluator
 # from torchinfo import summary
 # from line_profiler_pycharm import profile
 # import time
@@ -18,10 +18,10 @@ args = {
     'num_MC': 400,
     'num_child': 40,
     'num_table': 200,
-    'num_agent': 700,
+    'num_agent': 600,
     # 'num_moves': 5,
     'leaf_buffer_size': 5000,
-    'eval_batch_size': 700,
+    'eval_batch_size': 600,
     'res_channels': 32,
     'hid_channels': 16,
     'num_res': 4,
@@ -36,7 +36,8 @@ terminal_check = TerminalCheck01(args)
 model = SimpleModel01(args)
 # model = DeepMindModel01(args)
 model.eval()
-engine = SearchEngine(args, game, terminal_check, model)
+evaluator = Evaluator(args, game, terminal_check, model)
+engine = SearchEngine(args, game, evaluator)
 
 player = -torch.ones(args.get('num_table'), dtype=torch.int32)
 position = game.get_random_positions(n_state=args.get('num_table'), n_plus=5, n_minus=5)

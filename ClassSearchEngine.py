@@ -10,13 +10,11 @@ from line_profiler_pycharm import profile
 
 
 class SearchEngine:
-    def __init__(self, args: dict, game, terminal_check, model):
+    def __init__(self, args: dict, game, evaluator):
         self.args = args
         self.game = game
-        self.terminal_check = terminal_check
-        self.model = model
-
-        # TODO: self.evaluator = evaluator
+        self.evaluator = evaluator
+        # self.model = model
 
         # Set up parameters
         self.num_table = args.get('num_table')
@@ -198,66 +196,32 @@ class SearchEngine:
         self.buffer_mgr.post_process()
         return
 
-    # @profile
-    # def start_evaluation(self):
-    #     self.buffer_mgr.swap_buffers()
-    #     states = self.buffer_mgr.get_states()
-    #     states_CUDA = states.to(device=self.CUDA_device, dtype=torch.float32, non_blocking=True)
-    #     with torch.no_grad():
-    #         term_indicator_CUDA = self.terminal_check(states_CUDA)
-    #         result_CUDA = self.model(states_CUDA)
-    #     return term_indicator_CUDA, result_CUDA
-    #
-    # @profile
-    # def end_evaluation(self, term_indicator_CUDA, result_CUDA):
-    #     term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=False)
-    #     logit = result_CUDA[0].to(device='cpu', non_blocking=False)
-    #     value = result_CUDA[1].to(device='cpu', non_blocking=False)
-    #     # term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=True)
-    #     # logit = result_CUDA[0].to(device='cpu', non_blocking=True)
-    #     # value = result_CUDA[1].to(device='cpu', non_blocking=True)
-    #     # Interpret result ...
-    #     dir_max = term_indicator[:, 0]
-    #     dir_min = term_indicator[:, 1]
-    #     sum_abs = term_indicator[:, 2]
-    #     plus_mask = (dir_max + 0.1 > self.game.win_length)
-    #     minus_mask = (dir_min - 0.1 < -self.game.win_length)
-    #     draw_mask = (sum_abs + 0.1 > self.action_size)
-    #     value[draw_mask] = 0.0
-    #     value[plus_mask] = 1.05
-    #     value[minus_mask] = -1.05
-    #     # value = players * value
-    #     terminal_mask = plus_mask | minus_mask | draw_mask
-    #
-    #     self.buffer_mgr.add_eval_results(logit, value, terminal_mask)
-    #     return
-
     @profile
     def batch_evaluate(self):
         # TODO: Structure with evaluator
-        states = self.buffer_mgr.get_states()
-        states_CUDA = states.to(device=self.CUDA_device, dtype=torch.float32, non_blocking=True)
-        with torch.no_grad():
-            term_indicator_CUDA = self.terminal_check(states_CUDA)
-            result_CUDA = self.model(states_CUDA)
-
-        term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=False)
-        logit = result_CUDA[0].to(device='cpu', non_blocking=False)
-        value = result_CUDA[1].to(device='cpu', non_blocking=False)
-        # Interpret result ...
-        dir_max = term_indicator[:, 0]
-        dir_min = term_indicator[:, 1]
-        sum_abs = term_indicator[:, 2]
-        plus_mask = (dir_max + 0.1 > self.game.win_length)
-        minus_mask = (dir_min - 0.1 < -self.game.win_length)
-        draw_mask = (sum_abs + 0.1 > self.action_size)
-        value[draw_mask] = 0.0
-        value[plus_mask] = 1.05
-        value[minus_mask] = -1.05
-        # value = players * value
-        terminal_mask = plus_mask | minus_mask | draw_mask
-
-        self.buffer_mgr.add_eval_results(logit, value, terminal_mask)
+        state = self.buffer_mgr.get_states()
+        # states_CUDA = states.to(device=self.CUDA_device, dtype=torch.float32, non_blocking=True)
+        # with torch.no_grad():
+        #     term_indicator_CUDA = self.terminal_check(states_CUDA)
+        #     result_CUDA = self.model(states_CUDA)
+        #
+        # term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=False)
+        # logit = result_CUDA[0].to(device='cpu', non_blocking=False)
+        # value = result_CUDA[1].to(device='cpu', non_blocking=False)
+        # # Interpret result ...
+        # dir_max = term_indicator[:, 0]
+        # dir_min = term_indicator[:, 1]
+        # sum_abs = term_indicator[:, 2]
+        # plus_mask = (dir_max + 0.1 > self.game.win_length)
+        # minus_mask = (dir_min - 0.1 < -self.game.win_length)
+        # draw_mask = (sum_abs + 0.1 > self.action_size)
+        # value[draw_mask] = 0.0
+        # value[plus_mask] = 1.05
+        # value[minus_mask] = -1.05
+        # # value = players * value
+        # terminal_mask = plus_mask | minus_mask | draw_mask
+        logit, state_value, terminal = self.evaluator.evaluate(state)
+        self.buffer_mgr.add_eval_results(logit, state_value, terminal)
         return
 
     @profile
