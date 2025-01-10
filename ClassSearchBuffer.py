@@ -61,9 +61,9 @@ class LeafBuffer:
         self.multi[: self.next_idx] = uni_count
         return
 
-    def add_eval_results(self, logits, values, are_terminal):
+    def add_eval_results(self, logits, state_values, are_terminal):
         self.logit[: self.next_idx, :] = logits
-        self.value[: self.next_idx] = values * self.player[: self.next_idx]
+        self.value[: self.next_idx] = state_values * self.player[: self.next_idx]
         self.is_terminal[: self.next_idx] = are_terminal
         return
 
@@ -188,8 +188,8 @@ class SearchBufferManager:
     def get_states(self):
         return self.leaf_collect.get_states()
 
-    def add_eval_results(self, logits, values, are_terminal):
-        self.leaf_collect.add_eval_results(logits, values, are_terminal)
+    def add_eval_results(self, logits, state_values, are_terminal):
+        self.leaf_collect.add_eval_results(logits, state_values, are_terminal)
 
     def get_expand_data(self):
         return self.leaf_collect.get_leaf_data()
