@@ -57,7 +57,7 @@ class Evaluator:
         plus_mask = (dir_max + 0.1 > self.game.win_length)
         minus_mask = (dir_min - 0.1 < -self.game.win_length)
         draw_mask = (sum_abs + 0.1 > self.game.action_size)
-        state_value = torch.zeros_like(state, dtype=torch.float32)
+        state_value = torch.zeros(state.shape[0], dtype=torch.float32)
         state_value[draw_mask] = 0.0
         state_value[plus_mask] = 1.0
         state_value[minus_mask] = -1.0
