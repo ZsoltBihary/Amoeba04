@@ -166,9 +166,9 @@ class SearchEngine:
         self.tree.ucb[table, new_node] -= self.ucb_penalty
 
         # self.split_agents(agent, table, child_node, depth_max=2)
-        # self.split_agents(agent, table, child_node, depth_max=4)
+        self.split_agents(agent, table, child_node, depth_max=4)
         # self.split_agents(agent, table, child_node, depth_max=6)
-        # self.split_agents(agent, table, child_node, depth_max=10)
+        self.split_agents(agent, table, child_node, depth_max=8)
 
         # Update agent attributes ...
         # self.tree.ucb[table, new_node] += (self.branch_penalty - self.ucb_penalty)

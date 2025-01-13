@@ -15,13 +15,13 @@ args = {
     # 'CUDA_device': 'cpu',
     # 'num_leaf': 8,
     # 'num_branch': 2,
-    'num_MC': 600,
+    'num_MC': 500000,
     'num_child': 40,
-    'num_table': 50,
-    'num_agent': 150,
-    # 'num_moves': 5,
-    'leaf_buffer_size': 5000,
-    'eval_batch_size': 300,
+    'num_table': 1,
+    'num_agent': 1000,
+    'num_moves': 50,
+    'leaf_buffer_capacity': 20000,
+    'eval_batch_size': 800,
     'res_channels': 32,
     'hid_channels': 16,
     'num_res': 4,
@@ -40,11 +40,11 @@ evaluator = Evaluator(args, game, terminal_check, model)
 engine = SearchEngine(args, game, evaluator)
 
 player = -torch.ones(args.get('num_table'), dtype=torch.int32)
-position = game.get_random_positions(n_state=args.get('num_table'), n_plus=5, n_minus=5)
+position = game.get_random_positions(n_state=args.get('num_table'), n_plus=2, n_minus=0)
 table = torch.arange(args.get('num_table'))
 
 # Let us monitor a little bit of gameplay ...
-for i in range(10):
+for i in range(args.get('num_moves')):
     print(i)
     game.print_board(position[0])
     move_policy, position_value = engine.analyze(player, position)
