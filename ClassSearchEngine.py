@@ -57,13 +57,12 @@ class SearchEngine:
     def reset(self, root_player, root_position):
         self.buffer_mgr.reset()
         self.tree.reset()
+        self.evaluator.model.eval()
         self.root_player[:] = root_player
         self.root_position[:, :] = root_position
         self.active[:] = False
         self.table_order = torch.arange(self.num_table)
         self.av_num_agent = 1.0
-        # num_legal = torch.sum(position == 0)
-        # self.num_branch = min(self.max_num_branch, num_legal.item())
         return
 
     @profile

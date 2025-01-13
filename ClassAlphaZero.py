@@ -4,6 +4,7 @@ from ClassAmoeba import Amoeba
 from ClassSearchEngine import SearchEngine
 from ClassEvaluator import Evaluator
 from ClassTrainerBuffer import TrainerBuffer
+from ClassTrainer import Trainer
 # from torchinfo import summary
 from line_profiler_pycharm import profile
 # import time
@@ -61,6 +62,7 @@ class AlphaZero:
         self.search_engine = SearchEngine(args, game, evaluator)
         self.play_history = PlayHistory(self.num_table, self.action_size+1, self.action_size)
         self.trainer_buffer = TrainerBuffer(self.trainer_buffer_capacity, self.action_size)
+        self.trainer = Trainer(evaluator.model, self.trainer_buffer)
 
         self.next_move_idx = torch.zeros(self.num_table, dtype=torch.long)
         # TODO: Precalculate inverse temperatures ...
@@ -147,6 +149,11 @@ class AlphaZero:
             print(i+1,
                   f"  Buffer size: {len(self.trainer_buffer)}",
                   f"  Data count: {self.trainer_buffer.data_count}")
+
+            if self.trainer_buffer.data_count > self.trainer_buffer_capacity // 3:
+                print('Training begins ...')
+                self.trainer.improve_model()
+                # self.trainer_buffer.reset_counter()
 
         return
 

@@ -96,6 +96,7 @@ class SimpleModel01(nn.Module):
     def __init__(self, args: dict):
         super(SimpleModel01, self).__init__()
         self.args = args
+        self.device = args.get('CUDA_device')
         self.encoder = SimpleEncoder01(args)
         # At this point, I am providing realistic parameters by hand.
 
@@ -127,7 +128,7 @@ class SimpleModel01(nn.Module):
         self.policy_logit_w = nn.Parameter(policy_logit_tensor)
         self.value_plus_w = nn.Parameter(value_plus_tensor)
         self.value_minus_w = nn.Parameter(value_minus_tensor)
-        self.to(args.get('CUDA_device'))
+        self.to(self.device)
 
     @profile
     def forward(self, state_CUDA):
