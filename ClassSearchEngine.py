@@ -265,9 +265,10 @@ class SearchEngine:
         root = torch.ones(self.num_table, dtype=torch.long)
         position_value = self.tree.value[table, root]
         root_children = self.tree.get_children(table, root)
-        counts = self.tree.count[table.view(-1, 1), root_children]
+        counts = (0.01 * self.tree.count[table.view(-1, 1), root_children]) ** 5.0
         actions = self.tree.action[table.view(-1, 1), root_children]
         probs = counts / torch.sum(counts, dim=1, keepdim=True)
         move_policy = torch.zeros((self.num_table, self.action_size), dtype=torch.float32)
         move_policy[table.view(-1, 1), actions] = probs
+        # print(torch.round(100.0 * move_policy[0, :]))
         return move_policy, position_value

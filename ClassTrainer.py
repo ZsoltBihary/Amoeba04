@@ -45,7 +45,7 @@ class Trainer:
         Improve the model using data from the buffer by training for a few epochs.
         """
         train_loader = DataLoader(self.buffer, batch_size=64, shuffle=True)
-        self.fit(train_loader, num_epochs=10)
+        self.fit(train_loader, num_epochs=20)
         self.buffer.reset_counter()
 
     def fit(self, train_loader, num_epochs):
