@@ -4,21 +4,22 @@ from line_profiler_pycharm import profile
 
 
 class LeafBuffer:
-    def __init__(self, buffer_size, action_size, max_depth):
-        self.size = buffer_size
+    # TODO: Rename buffer_size to capacity
+    def __init__(self, capacity, action_size, max_depth):
+        self.capacity = capacity
         self.next_idx = 0
 
-        self.table = torch.zeros(self.size, dtype=torch.long)
-        self.node = torch.zeros(self.size, dtype=torch.long)
-        self.player = torch.zeros(self.size, dtype=torch.int32)
-        self.position = torch.zeros((self.size, action_size), dtype=torch.int32)
-        self.path = torch.zeros((self.size, max_depth), dtype=torch.long)
-        self.depth = torch.zeros(self.size, dtype=torch.long)
-        self.logit = torch.zeros((self.size, action_size), dtype=torch.float32)
-        self.value = torch.zeros(self.size, dtype=torch.float32)
-        self.is_terminal = torch.zeros(self.size, dtype=torch.bool)
+        self.table = torch.zeros(self.capacity, dtype=torch.long)
+        self.node = torch.zeros(self.capacity, dtype=torch.long)
+        self.player = torch.zeros(self.capacity, dtype=torch.int32)
+        self.position = torch.zeros((self.capacity, action_size), dtype=torch.int32)
+        self.path = torch.zeros((self.capacity, max_depth), dtype=torch.long)
+        self.depth = torch.zeros(self.capacity, dtype=torch.long)
+        self.logit = torch.zeros((self.capacity, action_size), dtype=torch.float32)
+        self.value = torch.zeros(self.capacity, dtype=torch.float32)
+        self.is_terminal = torch.zeros(self.capacity, dtype=torch.bool)
 
-        self.multi = torch.zeros(self.size, dtype=torch.int32)
+        self.multi = torch.zeros(self.capacity, dtype=torch.int32)
 
     def empty(self):
         self.next_idx = 0
@@ -90,13 +91,14 @@ class LeafBuffer:
 
 
 class ChildBuffer:
-    def __init__(self, buffer_size):
-        self.size = buffer_size
+    # TODO: Rename buffer_size to capacity
+    def __init__(self, capacity):
+        self.capacity = capacity
         self.next_idx = 0
-        self.table = torch.zeros(self.size, dtype=torch.long)
-        self.parent = torch.zeros(self.size, dtype=torch.long)
-        self.child = torch.zeros(self.size, dtype=torch.long)
-        self.parent_player = torch.zeros(self.size, dtype=torch.int32)
+        self.table = torch.zeros(self.capacity, dtype=torch.long)
+        self.parent = torch.zeros(self.capacity, dtype=torch.long)
+        self.child = torch.zeros(self.capacity, dtype=torch.long)
+        self.parent_player = torch.zeros(self.capacity, dtype=torch.int32)
 
     def empty(self):
         self.next_idx = 0
@@ -119,16 +121,16 @@ class ChildBuffer:
         self.child = new_child
         self.parent_player = new_parent_player
         # Update the buffer size
-        self.size = new_size
+        self.capacity = new_size
         return
 
     def add(self, tables, parents, children, parent_players):
         num_new_entries = tables.shape[0]
         end_idx = self.next_idx + num_new_entries
         # Check if buffer size needs to be increased
-        if end_idx > self.size:
+        if end_idx > self.capacity:
             # Double the size to accommodate growth
-            new_size = max(self.size * 2, end_idx)
+            new_size = max(self.capacity * 2, end_idx)
             self.resize(new_size)
         # Add the new data
         self.table[self.next_idx: end_idx] = tables
@@ -145,62 +147,48 @@ class ChildBuffer:
                 self.child[: self.next_idx],
                 self.parent_player[: self.next_idx])
 
-    # @profile
-    # def filter_unique(self):
-    #     tables, parents, children, players = self.get_data()
-    #     #  Combine data into a single tensor of shape (N, 4)
-    #     combined = torch.stack([tables, parents, children, players], dim=1)
-    #     uni_combined = torch.unique(combined, dim=0)
-    #     uni_tables = uni_combined[:, 0]
-    #     uni_parents = uni_combined[:, 1]
-    #     uni_children = uni_combined[:, 2]
-    #     uni_players = uni_combined[:, 3]
-    #     self.empty()
-    #     self.add(uni_tables, uni_parents, uni_children, uni_players)
-    #     return
-
 
 class SearchBufferManager:
-    def __init__(self, leaf_buffer_size, child_buffer_size, min_batch_size, action_size, max_depth):
+    def __init__(self, leaf_capacity, child_capacity, min_batch_size, action_size, max_depth):
 
         self.min_batch_size = min_batch_size
         self.action_size = action_size
         self.max_depth = max_depth
 
-        self.leaf_collect = LeafBuffer(leaf_buffer_size, action_size, max_depth)
-        self.child_collect = ChildBuffer(child_buffer_size)
+        self.leaf_buffer = LeafBuffer(leaf_capacity, action_size, max_depth)
+        self.child_buffer = ChildBuffer(child_capacity)
         self.batch_full = False
 
     def reset(self):
-        self.leaf_collect.empty()
-        self.child_collect.empty()
+        self.leaf_buffer.empty()
+        self.child_buffer.empty()
         self.batch_full = False
 
     def add_leaves(self, tables, nodes, players, positions, paths, depths):
-        self.leaf_collect.add_leaves(tables, nodes, players, positions, paths, depths)
-        if self.leaf_collect.next_idx > self.min_batch_size:
+        self.leaf_buffer.add_leaves(tables, nodes, players, positions, paths, depths)
+        if self.leaf_buffer.next_idx > self.min_batch_size:
             self.batch_full = True
 
     def add_children(self, tables, parents, children, parent_players):
-        self.child_collect.add(tables, parents, children, parent_players)
+        self.child_buffer.add(tables, parents, children, parent_players)
         return
 
     def get_states(self):
-        return self.leaf_collect.get_states()
+        return self.leaf_buffer.get_states()
 
     def add_eval_results(self, logits, state_values, are_terminal):
-        self.leaf_collect.add_eval_results(logits, state_values, are_terminal)
+        self.leaf_buffer.add_eval_results(logits, state_values, are_terminal)
 
     def get_expand_data(self):
-        return self.leaf_collect.get_leaf_data()
+        return self.leaf_buffer.get_leaf_data()
 
     def get_propagate_data(self):
-        return self.leaf_collect.get_path_data()
+        return self.leaf_buffer.get_path_data()
 
     def get_ucb_data(self):
-        return self.child_collect.get_data()
+        return self.child_buffer.get_data()
 
     @profile
     def post_process(self):
-        self.leaf_collect.filter_unique()
+        self.leaf_buffer.filter_unique()
         return

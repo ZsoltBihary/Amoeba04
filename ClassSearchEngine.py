@@ -28,11 +28,11 @@ class SearchEngine:
         # self.max_num_branch = args.get('num_branch')
         # self.num_branch = 1
         # Set up search buffer manager
-        self.buffer_mgr = SearchBufferManager(leaf_buffer_size=args.get('leaf_buffer_size'),
-                                              child_buffer_size=args.get('leaf_buffer_size') * self.num_child * 2,
-                                              min_batch_size=args.get('eval_batch_size'),
-                                              action_size=self.action_size,
-                                              max_depth=self.max_depth)
+        self.buffer_mgr = (
+            SearchBufferManager(leaf_capacity=args.get('leaf_buffer_capacity'),
+                                child_capacity=args.get('leaf_buffer_capacity') * self.num_child * 2,
+                                min_batch_size=args.get('eval_batch_size'), action_size=self.action_size,
+                                max_depth=self.max_depth))
         # Set up search tree
         self.tree = SearchTree(num_table=self.num_table,
                                num_node=self.num_node,
@@ -268,7 +268,7 @@ class SearchEngine:
         root_children = self.tree.get_children(table, root)
         counts = self.tree.count[table.view(-1, 1), root_children]
         actions = self.tree.action[table.view(-1, 1), root_children]
-        probs = counts / torch.sum(counts)
+        probs = counts / torch.sum(counts, dim=1, keepdim=True)
         move_policy = torch.zeros((self.num_table, self.action_size), dtype=torch.float32)
         move_policy[table.view(-1, 1), actions] = probs
         return move_policy, position_value

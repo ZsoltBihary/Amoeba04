@@ -6,20 +6,21 @@ from ClassEvaluator import Evaluator
 from ClassAlphaZero import AlphaZero
 # from torchinfo import summary
 # from line_profiler_pycharm import profile
-# import time
+import time
 
 # Collect parameters in a dictionary
 args = {
     'board_size': 15,
     'win_length': 5,
     'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
-    'num_MC': 50,
+    'num_MC': 500,
     'num_child': 40,
-    'num_table': 50,
-    'num_agent': 100,
-    'num_moves': 100,
-    'leaf_buffer_size': 2000,
-    'eval_batch_size': 200,
+    'num_table': 200,
+    'num_agent': 700,
+    'num_moves': 5000,
+    'leaf_buffer_capacity': 4000,
+    'eval_batch_size': 800,
+    'trainer_buffer_capacity': 100000,
     'res_channels': 32,
     'hid_channels': 16,
     'num_res': 4,
@@ -35,7 +36,14 @@ model = SimpleModel01(args)
 # model = DeepMindModel01(args)
 model.eval()
 evaluator = Evaluator(args, game, terminal_check, model)
-# engine = SearchEngine(args, game, evaluator)
 
+start = time.time()
 alpha = AlphaZero(args, game, evaluator)
 alpha.self_play()
+
+elapsed_time = (time.time() - start) / 60.0
+print(f"Elapsed time: {elapsed_time:.1f} minutes")
+n_generated = args.get('num_table') * args.get('num_moves')
+print(f"Positions generated: {n_generated:.0f}")
+gen_per_minute = n_generated / elapsed_time
+print(f"Generated per minute: {gen_per_minute:.0f}")
