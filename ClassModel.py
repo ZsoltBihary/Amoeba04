@@ -99,29 +99,33 @@ class SimpleModel01(nn.Module):
         self.device = args.get('CUDA_device')
         self.encoder = SimpleEncoder01(args)
         # At this point, I am providing realistic parameters by hand.
-
+        # ***** Original values *****
         # policy_logit_par = [15.0, 7.225, 1.609, 0.630, 0.313,
         #                     -0.041,
-        #                     0.276, 0.848, 2.492, 10.039, 15.0]
+        #                     0.276, 0.848, 2.492, 100.039, 15.0]
         # value_plus_par = [0.034, 0.152, 0.288, 0.654, 3.848, 10.0]
         #
         # value_minus_par = [-10.0, -1.267, -0.668, -0.343, -0.141, -0.019]
+        # ***********************
+        # ***** After 1. training *****
+        policy_logit_par = [0.0, 18.95, 6.777, 2.333, 0.5559,
+                            0.0375,
+                            1.0161, 2.8098, 9.0137, 25.622, 0.0]
 
-        policy_logit_par = [15.0, 7.225, 1.609, 0.630, 0.313,
-                            -0.041,
-                            0.276, 0.848, 2.492, 100.039, 15.0]
-        value_plus_par = [0.034, 0.152, 0.288, 0.654, 3.848, 10.0]
+        value_plus_par = [-0.0101, 0.0287, 0.0761, 0.2616, 3.0438, 0.0]
 
-        value_minus_par = [-10.0, -1.267, -0.668, -0.343, -0.141, -0.019]
-
-        # policy_logit_par = [15.0, 7.225, 1.609, 0.670, 0.393,
-        #                     0.001,
-        #                     0.356, 0.888, 2.492, 10.039, 15.0]
-        # value_plus_par = [0.004, 0.152, 0.288, 0.654, 3.848, 10.0]
+        value_minus_par = [0.0, -1.4560, -0.1130, -0.0688, -0.0334, 0.0182]
+        # ***********************
+        # ***** After 2. training *****
+        # policy_logit_par = [0.0, 18.17, 6.13, 1.979, 0.451,
+        #                     -0.0172,
+        #                     0.896, 2.486, 8.435, 23.64, 0.0]
         #
-        # value_minus_par = [-10.0, -1.267, -0.668, -0.343, -0.141, -0.009]
+        # value_plus_par = [-0.0085, 0.0431, 0.0737, 0.2668, 3.0476, 0.0]
+        #
+        # value_minus_par = [0.0, -1.3664, -0.1116, -0.0749, -0.0706, 0.0166]
+        # ***********************
 
-        # policy_logit_tensor = torch.tensor(policy_logit_par, dtype=torch.float32) * 0.2
         policy_logit_tensor = torch.tensor(policy_logit_par, dtype=torch.float32)
         value_plus_tensor = torch.tensor(value_plus_par, dtype=torch.float32)
         value_minus_tensor = torch.tensor(value_minus_par, dtype=torch.float32)

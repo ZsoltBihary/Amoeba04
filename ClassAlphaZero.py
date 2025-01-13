@@ -150,9 +150,12 @@ class AlphaZero:
                   f"  Buffer size: {len(self.trainer_buffer)}",
                   f"  Data count: {self.trainer_buffer.data_count}")
 
-            if self.trainer_buffer.data_count > self.trainer_buffer_capacity // 5:
+            if self.trainer_buffer.data_count > self.trainer_buffer_capacity // 4:
                 print('Training begins ...')
                 self.trainer.improve_model()
+                for name, param in self.evaluator.model.named_parameters():
+                    print(f"Parameter name: {name}")
+                    print(f"Parameter value: {param}")
                 # self.trainer_buffer.reset_counter()
 
         return
