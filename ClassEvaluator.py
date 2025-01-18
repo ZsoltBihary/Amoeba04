@@ -23,6 +23,7 @@ class Evaluator:
             result_CUDA = self.model(state_CUDA)
         term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=False)
         logit = result_CUDA[0].to(device='cpu', non_blocking=False)
+        logit -= torch.abs(state) * 999.9
         state_value = result_CUDA[1].to(device='cpu', non_blocking=False)
 
         # Interpret result ...

@@ -1,6 +1,6 @@
 import torch
 from ClassAmoeba import Amoeba
-from ClassModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
+from OldClassModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
 # from ClassSearchEngine import SearchEngine
 from ClassEvaluator import Evaluator
 from ClassAlphaZero import AlphaZero
@@ -13,14 +13,15 @@ args = {
     'board_size': 15,
     'win_length': 5,
     'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
-    'num_MC': 600,
+    'num_MC': 800,
     'num_child': 40,
     'num_table': 200,
-    'num_agent': 800,
+    'num_agent': 700,
     'leaf_buffer_capacity': 4000,
-    'eval_batch_size': 1000,
+    'eval_batch_size': 800,
     'num_moves': 1000,
     'trainer_buffer_capacity': 20000,
+    'symmetry_used': False,
     'res_channels': 32,
     'hid_channels': 16,
     'num_res': 4,

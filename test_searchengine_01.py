@@ -1,6 +1,6 @@
 import torch
 from ClassAmoeba import Amoeba
-from ClassModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
+from OldClassModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
 from ClassSearchEngine import SearchEngine
 from ClassEvaluator import Evaluator
 # from torchinfo import summary
@@ -19,7 +19,7 @@ args = {
     'num_child': 40,
     'num_table': 1,
     'num_agent': 1000,
-    'num_moves': 50,
+    'num_moves': 5,
     'leaf_buffer_capacity': 20000,
     'eval_batch_size': 800,
     'res_channels': 32,

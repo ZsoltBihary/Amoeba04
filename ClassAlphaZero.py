@@ -65,8 +65,9 @@ class AlphaZero:
         self.trainer = Trainer(evaluator.model, self.trainer_buffer)
 
         self.next_move_idx = torch.zeros(self.num_table, dtype=torch.long)
-        # TODO: Precalculate inverse temperatures ...
-        # self.inverse_temp = torch.zeros(self.max_move_idx, dtype=torch.float32)
+        # TODO: Precalculate how many best moves are considered ...
+        self.k_move_select = torch.ones(self.max_move_idx, dtype=torch.int32)
+        self.k_move_select[: 10] = 10
         self.all_table = torch.arange(self.num_table)
         self.player = torch.zeros(self.num_table, dtype=torch.int32)
         self.position = torch.zeros((self.num_table, self.action_size), dtype=torch.int32)
@@ -78,9 +79,8 @@ class AlphaZero:
         if n_table == 0:
             return
         self.play_history.empty(tables)
-        # TODO: This is a possible start with one +1 and one -1 stone, next player is +1
-        #   Could be different ...
-        self.position[tables] = self.game.get_random_positions(n_table, n_plus=2, n_minus=1)
+
+        self.position[tables] = self.game.get_random_positions(n_table, n_plus=1, n_minus=0)
         self.player[tables] = -1
         self.next_move_idx[tables] = 0
         return
@@ -88,12 +88,31 @@ class AlphaZero:
     def save_history_to_buffer(self, table_idx, result):
 
         max_move, player, position, policy, value = self.play_history.get_data(table_idx)
-        sum_policy = torch.sum(policy, dim=1)
         state = player.view(-1, 1) * position
-        # TODO: We may want to make this more sophisticated ...
-        state_value = player * result
-        # TODO: This is the place to extend data to symmetric equivalent states ...
-        self.trainer_buffer.add_batch(state, policy, state_value)
+        # Deepmind specification: state_value = player * result. I am using a more sophisticated approach ...
+        # Calculate moving average for the values ...
+        # Smoothing factor
+        alpha = 0.3
+        # Initialize the averaged tensor
+        av_value = torch.empty_like(value)
+        av_value[-1] = value[-1]  # Set the last element
+        # Compute iteratively going backwards
+        for t in range(len(value) - 2, -1, -1):  # Start from the second-to-last element
+            av_value[t] = alpha * value[t] + (1 - alpha) * av_value[t + 1]
+        memory = 30.0
+        beta = 0.9
+        w_result = memory / (memory + len(value) - torch.arange(len(value)))
+        w_av_value = (1.0 - w_result) * beta
+        est_value = w_result * result + w_av_value * av_value
+        state_value = player * est_value
+        # DONE: This is the place to extend data to symmetric equivalent states ...
+        if self.args.get('symmetry_used'):
+            state_sym = self.game.get_symmetry_states(state)
+            policy_sym = self.game.get_symmetry_states(policy)
+            state_value_sym = state_value.repeat(8)
+            self.trainer_buffer.add_batch(state_sym, policy_sym, state_value_sym)
+        else:
+            self.trainer_buffer.add_batch(state, policy, state_value)
 
         return
 
@@ -121,12 +140,23 @@ class AlphaZero:
         return
 
     def make_move(self, move_policy):
-        # TODO: Currently, this is deterministic.
-        #   Make it probabilistic, using inverse temperature ...
-        move_action = torch.argmax(move_policy, dim=1)
-        self.position[self.all_table, move_action] = self.player
+        # Move selection is probabilistic, selecting from top k
+        for table_idx in range(self.num_table):
+            policy = move_policy[table_idx, :]
+            move_idx = self.next_move_idx[table_idx]
+            k = self.k_move_select[move_idx].item()
+            if k == 1:
+                move_action = torch.argmax(policy)
+            else:
+                best_pol, best_actions = torch.topk(policy, k)
+                best_pol = best_pol ** (2.0 / k)
+                best_probs = best_pol / torch.sum(best_pol)
+                idx = torch.multinomial(best_probs, num_samples=1)
+                move_action = best_actions[idx]
+            self.position[table_idx, move_action] = self.player[table_idx]
+
         self.player *= -1
-        self.next_move_idx[:] += 1
+        self.next_move_idx += 1
         return
 
     @profile
@@ -156,63 +186,5 @@ class AlphaZero:
                 for name, param in self.evaluator.model.named_parameters():
                     print(f"Parameter name: {name}")
                     print(f"Parameter value: {param}")
-                # self.trainer_buffer.reset_counter()
 
         return
-
-# ********************* OLD ALPHAZERO MAIN LOOP *******************************************
-#     def self_play(self):
-#         # set up ...
-#         av_move = 0.0
-#
-#         current_player = -torch.ones(self.num_table, dtype=torch.int32, device=self.CPU_device)
-#         current_state = self.game.get_random_state(self.num_table, 1, 0)
-#
-#         i_move = 0
-#         while True:
-#             i_move += 1
-#             # self.game.print_board(current_state[0])
-#             self.model.eval()
-#             inv_temp = self.inv_temp_schedule[self.move_index]
-#             # print("inv_temp = ", inv_temp)
-#             action, probability, value = self.analyzer.analyze(current_player, current_state, inv_temp)
-#             # DONE: This is where we want to save the analysis result in game_history ...
-#             self.save_to_history(current_player, current_state, action, probability, value)
-#
-#             move = self.analyzer.select_move(action, probability)
-#             current_player, current_state = self.analyzer.make_move(move)
-#             self.move_index += 1
-#
-#             # Let us check for End of Game (EOG), and return result ...
-#             EOG, result = self.check_EOG(current_player, current_state)
-#             # result *= current_player
-#
-#             for i_table in range(self.num_table):
-#                 # if a game ends on a table ...
-#                 if EOG[i_table]:
-#                     # print("Game ", i_table, " ended. Result = ", result[i_table].item())
-#
-#                     # DONE: This is where we want to save game_history + result to buffer ...
-#                     self.save_to_buffer(i_table, result[i_table])
-#                     av_move = 0.98 * av_move + 0.02 * self.move_index[i_table].item()
-#
-#                     # reset i_table ...
-#                     current_player[i_table] = -1
-#                     current_state[i_table, :] = self.game.get_random_state(1, 1, 0)
-#                     self.move_index[i_table] = 0
-#
-#             print(i_move, ", av_move: ", round(av_move),
-#                   ", buff: ", len(self.buffer), ", new data: ", self.buffer.new_data_count)
-#
-#             if (len(self.buffer) > (self.buffer.size * 2) // 5 and
-#                     self.buffer.new_data_count > self.buffer.size // 5):
-#                 self.trainer.improve_model()
-#                 # for name, param in self.model.named_parameters():
-#                 #     print(f"Parameter name: {name}")
-#                 #     print(f"Parameter value: {param}")
-#                 if i_move > self.max_moves:
-#                     break
-#             # if i_move >= self.max_moves:
-#             #     break
-
-

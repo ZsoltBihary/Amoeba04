@@ -165,10 +165,14 @@ class SearchEngine:
         # Lower ucb for best child to facilitate branching for consecutive paths ...
         self.tree.ucb[table, new_node] -= self.ucb_penalty
 
-        # self.split_agents(agent, table, child_node, depth_max=2)
-        self.split_agents(agent, table, child_node, depth_max=4)
-        # self.split_agents(agent, table, child_node, depth_max=6)
-        self.split_agents(agent, table, child_node, depth_max=8)
+        # TODO: Splitting for more than 1 table still does not work...
+        if self.num_table == 1:
+            # Then split agents, speeding up gameplay ...
+            self.split_agents(agent, table, child_node, depth_max=4)
+            self.split_agents(agent, table, child_node, depth_max=8)
+        # Low depth nodes are split into 3, medium depth nodes are split into 2.
+        # else:
+        #     self.split_agents(agent, table, child_node, depth_max=3)
 
         # Update agent attributes ...
         # self.tree.ucb[table, new_node] += (self.branch_penalty - self.ucb_penalty)
