@@ -18,7 +18,7 @@ class SimpleEncoder01:
     @profile
     def interpret(self, state_tensor):
 
-        # device = 'cuda'
+        # CUDA_device = 'cuda'
         # state_tensor = player.reshape(-1, 1) * state
         board = state_tensor.reshape(-1, self.board_size, self.board_size).to(torch.long)
         board_plus = torch.clamp(board, min=0, max=1)
@@ -127,12 +127,12 @@ class SimpleModel01(nn.Module):
         # ***********************
         # name: policy_logit_w
         # tensor([0.0000, 15.6839, 4.8753, 1.4894, 0.3408, 0.0361, 0.7088, 2.0066,
-        #         6.5340, 21.4006, 0.0000], device='cuda:0', requires_grad=True)
+        #         6.5340, 21.4006, 0.0000], CUDA_device='cuda:0', requires_grad=True)
         # name: value_plus_w
-        # tensor([-0.0147, 0.0460, 0.1388, 0.3576, 3.1156, 0.0000], device='cuda:0',
+        # tensor([-0.0147, 0.0460, 0.1388, 0.3576, 3.1156, 0.0000], CUDA_device='cuda:0',
         #        requires_grad=True)
         # name: value_minus_w
-        # tensor([0.0000, -1.2691, -0.2513, -0.1015, -0.0866, 0.0234], device='cuda:0',
+        # tensor([0.0000, -1.2691, -0.2513, -0.1015, -0.0866, 0.0234], CUDA_device='cuda:0',
         #        requires_grad=True)
         # ***********************
 

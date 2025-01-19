@@ -38,42 +38,42 @@ class Amoeba:
             self.char_list = torch.arange(-self.win_length, self.win_length + 1,
                                           device=self.device, dtype=torch.float32)
 
-        def forward(self, state):
-            board = state.view(state.shape[0], self.board_size, -1)
-            point_encoded = soft_characteristic(board, self.stones).permute(0, 3, 1, 2)
-            # point_encoded: Tensor(N, 3, board_size, board_size)
-
-            dir_sum = self.dir_conv(point_encoded.repeat(1, 4, 1, 1))
-            dir_sum = dir_sum.permute(0, 2, 3, 1)
-            dir_sum = dir_sum.reshape(*dir_sum.shape[:-1], 4, 3)
-            diff = dir_sum[..., 1] - dir_sum[..., 2]
-            pen1 = 100.0 * (5 - torch.sum(dir_sum, dim=-1))
-            pen2 = 100.0 * (dir_sum[..., 1] * dir_sum[..., 2])
-            x = diff + pen1 + pen2
-            dir_encoded = soft_characteristic(x, self.char_list)
-            dir_encoded = dir_encoded.permute(0, 3, 4, 1, 2)
-            # dir_encoded: Tensor(N, 4, 11, board_size, board_size)
-
-            return point_encoded, dir_encoded
-
-    def test_terminal_encoded(self, encoded):
-        """
-        Test for terminal states using encoded representation.
-        Args:
-            encoded (torch.Tensor): The encoded state tensor.
-        Returns:
-            terminal_signal (torch.Tensor): A binary tensor indicating terminal states.
-        """
-        return (encoded.mean(dim=-1) > 1.0).float()  # Example logic
-
-
-
-
-
-
-    def move(self, idx, position, player, action):
-        # TODO: Implement this in other parts of the project ...
-        position[idx, action] = player
+    #     def forward(self, state):
+    #         board = state.view(state.shape[0], self.board_size, -1)
+    #         point_encoded = soft_characteristic(board, self.stones).permute(0, 3, 1, 2)
+    #         # point_encoded: Tensor(N, 3, board_size, board_size)
+    #
+    #         dir_sum = self.dir_conv(point_encoded.repeat(1, 4, 1, 1))
+    #         dir_sum = dir_sum.permute(0, 2, 3, 1)
+    #         dir_sum = dir_sum.reshape(*dir_sum.shape[:-1], 4, 3)
+    #         diff = dir_sum[..., 1] - dir_sum[..., 2]
+    #         pen1 = 100.0 * (5 - torch.sum(dir_sum, dim=-1))
+    #         pen2 = 100.0 * (dir_sum[..., 1] * dir_sum[..., 2])
+    #         x = diff + pen1 + pen2
+    #         dir_encoded = soft_characteristic(x, self.char_list)
+    #         dir_encoded = dir_encoded.permute(0, 3, 4, 1, 2)
+    #         # dir_encoded: Tensor(N, 4, 11, board_size, board_size)
+    #
+    #         return point_encoded, dir_encoded
+    #
+    # def test_terminal_encoded(self, encoded):
+    #     """
+    #     Test for terminal states using encoded representation.
+    #     Args:
+    #         encoded (torch.Tensor): The encoded state tensor.
+    #     Returns:
+    #         terminal_signal (torch.Tensor): A binary tensor indicating terminal states.
+    #     """
+    #     return (encoded.mean(dim=-1) > 1.0).float()  # Example logic
+    #
+    #
+    #
+    #
+    #
+    #
+    # def move(self, idx, position, player, action):
+    #     # TODO: Implement this in other parts of the project ...
+    #     position[idx, action] = player
 
     def get_empty_positions(self, n_state: int):
         return torch.zeros((n_state, self.action_size), dtype=torch.int32)
@@ -114,11 +114,11 @@ class Amoeba:
         # set up the symmetry transformations in terms of reindexing state vectors
         # there are 8 transformations of a square board
         flip45_index = torch.zeros(self.action_size, dtype=torch.long,
-                                   device=self.args.get('device'))
+                                   device=self.args.get('CUDA_device'))
         flip_col_index = torch.zeros(self.action_size, dtype=torch.long,
-                                     device=self.args.get('device'))
+                                     device=self.args.get('CUDA_device'))
         rot90_index = torch.zeros(self.action_size, dtype=torch.long,
-                                  device=self.args.get('device'))
+                                  device=self.args.get('CUDA_device'))
 
         for i in range(self.action_size):
             row = i // self.board_size
@@ -129,7 +129,7 @@ class Amoeba:
             rot90_index[i] = flip45_index[flip_col_index[i]]
 
         symmetry_index = torch.zeros((8, self.action_size), dtype=torch.long,
-                                     device=self.args.get('device'))
+                                     device=self.args.get('CUDA_device'))
         symmetry_index[0, :] = torch.arange(self.action_size)
         symmetry_index[1, :] = rot90_index
         for i in range(self.action_size):

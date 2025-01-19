@@ -56,7 +56,7 @@ print(point_encoded.shape, " , ", dir_encoded.shape)
 # model.eval()
 
 # logit, value = model(position_CUDA)
-# logit_int = (1 * logit[0].reshape(-1, args.get('board_size'))).to(device='cpu').detach().to(dtype=torch.int32).numpy()
+# logit_int = (1 * logit[0].reshape(-1, args.get('board_size'))).to(CUDA_device='cpu').detach().to(dtype=torch.int32).numpy()
 # print(logit_int)
 # print(value[0])
 #

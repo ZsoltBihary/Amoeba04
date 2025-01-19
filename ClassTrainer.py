@@ -60,10 +60,10 @@ class Trainer:
         for epoch in range(num_epochs):
             epoch_loss = 0.0
             for batch_idx, (state, target_policy, target_state_value) in enumerate(train_loader):
-                # Move data to the same device as the model
-                state = state.to(self.model.device)
-                target_policy = target_policy.to(self.model.device)
-                target_state_value = target_state_value.to(self.model.device)
+                # Move data to the same CUDA_device as the model
+                state = state.to(self.model.CUDA_device)
+                target_policy = target_policy.to(self.model.CUDA_device)
+                target_state_value = target_state_value.to(self.model.CUDA_device)
 
                 # Forward pass
                 logit, state_value = self.model(state)

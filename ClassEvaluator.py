@@ -49,8 +49,8 @@ class Evaluator:
             # result_CUDA = self.model(states_CUDA)
 
         term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=False)
-        # logit = result_CUDA[0].to(device='cpu', non_blocking=False)
-        # value = result_CUDA[1].to(device='cpu', non_blocking=False)
+        # logit = result_CUDA[0].to(CUDA_device='cpu', non_blocking=False)
+        # value = result_CUDA[1].to(CUDA_device='cpu', non_blocking=False)
         # Interpret result ...
         dir_max = term_indicator[:, 0]
         dir_min = term_indicator[:, 1]

@@ -47,7 +47,7 @@ class TrainerBuffer(Dataset):
         if policies.shape[0] != batch_size or state_values.shape[0] != batch_size:
             raise ValueError("Batch sizes of states, policies, and state_values must match.")
 
-        # Move data to the correct device if necessary
+        # Move data to the correct CUDA_device if necessary
         states = states.to(self.device)
         policies = policies.to(self.device)
         state_values = state_values.to(self.device)

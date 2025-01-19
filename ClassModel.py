@@ -36,12 +36,12 @@ class BiharyModel01(nn.Module):
 #     def __init__(self, args: dict):
 #         super(TrivialModel02, self).__init__()
 #         self.board_size = args.get('board_size')
-#         self.device = args.get('CUDA_device')
+#         self.CUDA_device = args.get('CUDA_device')
 #
 #         sum_kernel = 0.1 * torch.ones((1, 1, 3, 3), dtype=torch.float32)
 #
 #         self.sum_conv = CustomConvLayer(sum_kernel, 1)
-#         self.to(self.device)
+#         self.to(self.CUDA_device)
 #
 #     @profile
 #     def forward(self, state_CUDA):
@@ -57,8 +57,8 @@ class BiharyModel01(nn.Module):
 # class TrivialModel01(nn.Module):
 #     def __init__(self, args: dict):
 #         super(TrivialModel01, self).__init__()
-#         self.device = args.get('CUDA_device')
-#         self.to(self.device)
+#         self.CUDA_device = args.get('CUDA_device')
+#         self.to(self.CUDA_device)
 #
 #     @profile
 #     def forward(self, state_CUDA):
@@ -183,7 +183,7 @@ class BiharyModel01(nn.Module):
 #         self.num_res = args.get('num_res')
 #         self.policy_hid_channels = args.get('policy_hid_channels')
 #         self.value_hid_dim = args.get('value_hid_dim')
-#         self.device = args.get('CUDA_device')
+#         self.CUDA_device = args.get('CUDA_device')
 #         # First convolution (input layer)
 #         self.input_conv = InputBlock(self.res_channels)
 #         # Tower of residual blocks
@@ -193,7 +193,7 @@ class BiharyModel01(nn.Module):
 #         self.value_head = ValueHead01(self.res_channels,
 #                                       self.board_size ** 2,
 #                                       self.value_hid_dim)
-#         self.to(self.device)
+#         self.to(self.CUDA_device)
 #
 #     @profile
 #     def forward(self, state_CUDA):

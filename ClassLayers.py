@@ -68,8 +68,8 @@ class DirectionalConvolution(nn.Module):
 
 def directional_sum(one_hot_board, k: int):
 
-    # line = torch.ones(k, device=one_hot_board.device)
-    kernel_tensor = torch.ones(3, device=one_hot_board.device).diag_embed().unsqueeze(2).repeat(1, 1, k)
+    # line = torch.ones(k, CUDA_device=one_hot_board.CUDA_device)
+    kernel_tensor = torch.ones(3, device=one_hot_board.CUDA_device).diag_embed().unsqueeze(2).repeat(1, 1, k)
     dir_conv = DirectionalConvolution(3, 3, 5, kernel_tensor)
     sum_one_hot = dir_conv(one_hot_board.repeat(1, 4, 1, 1))
     return sum_one_hot
