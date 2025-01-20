@@ -26,7 +26,7 @@ class Game:
         Returns:
             state (torch.Tensor): Game states (N, state_size).
         """
-        state = player.view(-1, 1) * position
+        state = (player.view(-1, 1) * position).to(dtype=torch.float32)
         return state
 
     def move(self, position, player, action):
@@ -47,7 +47,7 @@ class Game:
         Args:
             state (torch.Tensor): Game states (N, state_size).
         Returns:
-            encoded (torch.Tensor): Encoded states (N, state_size).
+            encoded (varied): Encoded states (N, state_size).
         """
         raise NotImplementedError("Game-specific 'encode' method must be implemented.")
 
@@ -55,9 +55,9 @@ class Game:
         """
         Check if the encoded state is terminal. To be implemented by the derived class.
         Args:
-            encoded (torch.Tensor): Encoded states (N, state_size).
+            encoded (varied): Encoded states (N, state_size).
         Returns:
-            terminal_signal (torch.Tensor): Boolean flags for win / lose / draw (N, 3).
+            terminal_signal (tuple of torch.Tensors): Boolean flags for win / lose / draw (N, 3).
         """
         raise NotImplementedError("Game-specific 'check_terminal' method must be implemented.")
 
@@ -67,7 +67,7 @@ class Game:
         Args:
             state (torch.Tensor): Game states (N, state_size).
         Returns:
-            terminal_signal (torch.Tensor): Boolean flags for win / lose / draw (N, 3).
+            terminal_signal (tuple of torch.Tensors): Boolean flags for win / lose / draw (N, 3).
         """
         encoded = self.encode(state)
         terminal_signal = self.check_terminal_encoded(encoded)
@@ -79,7 +79,7 @@ class Amoeba(Game):
         super().__init__(config)
         self.board_size = config.get("board_size", 15)
         self.position_size = self.board_size ** 2
-        # self.action_size =
+        # self.action_size = self.board_size ** 2
         self.win_length = config.get("win_length", 5)
         self.CUDA_device = config.get("CUDA_device", "cpu")
         self.stones = torch.tensor([0.0, 1.0, -1.0], dtype=torch.float32, device=self.CUDA_device)
@@ -94,6 +94,7 @@ class Amoeba(Game):
         # +5: 5 black stones
         self.char_list = torch.arange(-self.win_length, self.win_length + 1,
                                       device=self.CUDA_device, dtype=torch.float32)
+        return
 
     def get_empty_positions(self, n: int):
         return torch.zeros((n, self.position_size), dtype=torch.int32)
@@ -115,9 +116,12 @@ class Amoeba(Game):
                     position[i, random_index] = -1
         return position
 
-    def print_board(self, position: torch.Tensor):
-        value_to_char = {-1: 'O', 0: '-', 1: 'X'}
-        board = position.reshape(self.board_size, self.board_size)
+    def print_board(self, position: torch.Tensor, last_action=-1):
+        pos = position.clone()
+        if last_action >= 0:
+            pos[last_action] *= 2
+        value_to_char = {-2: '(O)', -1: ' O ', 0: ' - ', 1: ' X ', 2: '(X)'}
+        board = pos.reshape(self.board_size, self.board_size)
         horizontal = " "
         for _ in range(self.board_size * 3):
             horizontal = horizontal + "-"
@@ -125,15 +129,15 @@ class Amoeba(Game):
         # Iterate through each row of the board
         for row in board:
             row_chars = [value_to_char[value.item()] for value in row]
-            row_string = '  '.join(row_chars)
-            print("| " + row_string + " |")
+            # row_string = '  '.join(row_chars)
+            row_string = ''.join(row_chars)
+            print("|" + row_string + "|")
         print(horizontal)
 
     def move(self, position, player, action):
-        # if position.dim() != 2 or player.dim() != 1 or action.dim() != 1:
-        #     raise ValueError("Position must be 2D, and player and action must be 1D tensors.")
-        # if not torch.all((action >= 0) & (action < position.shape[1])):
-        #     raise ValueError("Actions must be valid indices for the position tensor.")
+        # noinspection PyTypeChecker
+        if not torch.all(position[torch.arange(position.shape[0]), action] == 0):
+            raise ValueError("Illegal move: action must target an empty space (position == 0).")
         position[torch.arange(position.shape[0]), action] = player
         player *= -1
 
@@ -145,7 +149,7 @@ class Amoeba(Game):
         dir_sum = dir_sum.permute(0, 2, 3, 1)
         dir_sum = dir_sum.reshape(*dir_sum.shape[:-1], 4, 3)
         diff = dir_sum[..., 1] - dir_sum[..., 2]
-        penalty1 = 100.0 * (5 - torch.sum(dir_sum, dim=-1))
+        penalty1 = 100.0 * (self.win_length - torch.sum(dir_sum, dim=-1))
         penalty2 = 100.0 * (dir_sum[..., 1] * dir_sum[..., 2])
         x = diff + penalty1 + penalty2
         dir_encoded = soft_characteristic(x, self.char_list)
@@ -167,6 +171,8 @@ class Model(nn.Module):
         super().__init__()
         self.game = game
         self.core_model = core_model
+        # Direct handle to game.check_terminal. Let us see if it is necessary ...
+        self.check_terminal = game.check_terminal
 
     def forward(self, state):
         encoded = self.game.encode(state)
@@ -178,3 +184,48 @@ class Model(nn.Module):
         result = self.core_model(encoded)
         terminal_signal = self.game.check_terminal_encoded(encoded)
         return result, terminal_signal
+
+
+if __name__ == "__main__":
+    # Collect parameters in a dictionary
+    args = {
+        'board_size': 5,
+        'win_length': 5,
+        'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
+        # 'CUDA_device': 'cpu',
+    }
+    n = 1
+    my_game = Amoeba(args)
+    my_position = my_game.get_random_positions(n, 12, 12).to(dtype=torch.int32)
+    my_player = torch.ones(n, dtype=torch.int32)
+    my_game.print_board(my_position[0, :])
+    # my_action = torch.ones(n, dtype=torch.long) * 6
+    # my_game.move(my_position, my_player, my_action)
+    # my_game.print_board(my_position[0, :], my_action[0].item())
+    # my_action = torch.ones(n, dtype=torch.long) * 7
+    # my_game.move(my_position, my_player, my_action)
+    # my_game.print_board(my_position[0, :], my_action[0].item())
+
+    my_state = my_game.calc_state(my_player, my_position)
+    my_state_CUDA = my_state.to(device=args.get('CUDA_device'))
+    my_encoded = my_game.encode(my_state_CUDA)
+    my_signal = my_game.check_terminal_encoded(my_encoded)
+    print(my_signal)
+
+    a = 42
+    # position_CUDA = positions.cuda()
+
+    # interpreter = AmoebaInterpreter(args)
+    # encoder = AmoebaEncoder(args)
+    # terminal_check = AmoebaTerminal(args)
+    # point_interpreted, dir_interpreted = interpreter(position_CUDA)
+    # print("\ninterpreted Shapes:")
+    # print(point_interpreted.shape, " , ", dir_interpreted.shape)
+    #
+    # plus_signal, minus_signal, draw_signal = terminal_check(position_CUDA)
+    # print("\nplus_signal, minus_signal, draw_signal:")
+    # print(plus_signal, " , ", minus_signal, " , ", draw_signal)
+    #
+    # point_encoded, dir_encoded = encoder(point_interpreted, dir_interpreted, combine=True)
+    # print("\nencoded Shapes:")
+    # print(point_encoded.shape, " , ", dir_encoded.shape)
