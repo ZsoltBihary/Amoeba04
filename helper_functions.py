@@ -74,7 +74,7 @@ def helper_unique(x, dim=None):
     uniq, inverse, count = torch.unique(
         x, sorted=True, return_inverse=True, dim=dim, return_counts=True)
     perm = torch.arange(inverse.size(0), dtype=inverse.dtype,
-                        device=inverse.CUDA_device)
+                        device=inverse.device)
     # inverse, perm = inverse.flip([0]), perm.flip([0])
     return uniq, count, inverse.new_empty(uniq.size(0)).scatter_(0, inverse, perm)
 

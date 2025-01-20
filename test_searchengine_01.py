@@ -15,7 +15,7 @@ args = {
     # 'CUDA_device': 'cpu',
     # 'num_leaf': 8,
     # 'num_branch': 2,
-    'num_MC': 500000,
+    'num_MC': 50000,
     'num_child': 40,
     'num_table': 1,
     'num_agent': 1000,

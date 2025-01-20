@@ -154,7 +154,7 @@ class Amoeba(Game):
         x = diff + penalty1 + penalty2
         dir_encoded = soft_characteristic(x, self.char_list)
         dir_encoded = dir_encoded.permute(0, 3, 4, 1, 2)
-        # dir_encoded: Tensor(N, 4, 11, board_size, board_size)
+        # dir_encoded: Tensor(N, 4, 2*win_length+1, board_size, board_size)
         return point_encoded, dir_encoded
 
     def check_terminal_encoded(self, encoded):
@@ -213,19 +213,3 @@ if __name__ == "__main__":
     print(my_signal)
 
     a = 42
-    # position_CUDA = positions.cuda()
-
-    # interpreter = AmoebaInterpreter(args)
-    # encoder = AmoebaEncoder(args)
-    # terminal_check = AmoebaTerminal(args)
-    # point_interpreted, dir_interpreted = interpreter(position_CUDA)
-    # print("\ninterpreted Shapes:")
-    # print(point_interpreted.shape, " , ", dir_interpreted.shape)
-    #
-    # plus_signal, minus_signal, draw_signal = terminal_check(position_CUDA)
-    # print("\nplus_signal, minus_signal, draw_signal:")
-    # print(plus_signal, " , ", minus_signal, " , ", draw_signal)
-    #
-    # point_encoded, dir_encoded = encoder(point_interpreted, dir_interpreted, combine=True)
-    # print("\nencoded Shapes:")
-    # print(point_encoded.shape, " , ", dir_encoded.shape)
