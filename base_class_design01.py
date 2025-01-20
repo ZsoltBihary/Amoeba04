@@ -79,7 +79,7 @@ class Amoeba(Game):
         super().__init__(config)
         self.board_size = config.get("board_size", 15)
         self.position_size = self.board_size ** 2
-        # self.action_size = self.board_size ** 2
+        # self.position_size = self.board_size ** 2
         self.win_length = config.get("win_length", 5)
         self.CUDA_device = config.get("CUDA_device", "cpu")
         self.stones = torch.tensor([0.0, 1.0, -1.0], dtype=torch.float32, device=self.CUDA_device)

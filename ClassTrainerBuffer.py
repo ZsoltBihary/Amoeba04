@@ -39,8 +39,8 @@ class TrainerBuffer(Dataset):
         Add a batch of new data points to the buffer.
 
         Args:
-            states (torch.Tensor): Batch of states, shape (batch_size, action_size).
-            policies (torch.Tensor): Batch of policies, shape (batch_size, action_size).
+            states (torch.Tensor): Batch of states, shape (batch_size, position_size).
+            policies (torch.Tensor): Batch of policies, shape (batch_size, position_size).
             state_values (torch.Tensor): Batch of state values, shape (batch_size, 1).
         """
         batch_size = states.shape[0]

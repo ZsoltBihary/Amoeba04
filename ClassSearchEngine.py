@@ -22,8 +22,8 @@ class SearchEngine:
         self.num_MC = args.get('num_MC')
         self.num_agent = args.get('num_agent')
         self.num_node = (self.num_MC + 200) * self.num_child
-        self.action_size = game.action_size
-        self.max_depth = game.action_size + 1
+        self.position_size = game.position_size
+        self.max_depth = game.position_size + 1
         self.CUDA_device = args.get('CUDA_device')
         # self.max_num_branch = args.get('num_branch')
         # self.num_branch = 1
@@ -31,7 +31,7 @@ class SearchEngine:
         self.buffer_mgr = (
             SearchBufferManager(leaf_capacity=args.get('leaf_buffer_capacity'),
                                 child_capacity=args.get('leaf_buffer_capacity') * self.num_child * 2,
-                                min_batch_size=args.get('eval_batch_size'), action_size=self.action_size,
+                                min_batch_size=args.get('eval_batch_size'), action_size=self.position_size,
                                 max_depth=self.max_depth))
         # Set up search tree
         self.tree = SearchTree(num_table=self.num_table,
@@ -39,7 +39,7 @@ class SearchEngine:
                                num_child=self.num_child)
         # Set up root attributes
         self.root_player = torch.zeros(self.num_table, dtype=torch.int32)
-        self.root_position = torch.zeros((self.num_table, self.action_size), dtype=torch.int32)
+        self.root_position = torch.zeros((self.num_table, self.position_size), dtype=torch.int32)
         # Set up search agents attributes
         self.all_agents = torch.arange(self.num_agent)
         self.active = torch.zeros(self.num_agent, dtype=torch.bool)
@@ -47,7 +47,7 @@ class SearchEngine:
         self.node = torch.zeros(self.num_agent, dtype=torch.long)
         self.depth = torch.zeros(self.num_agent, dtype=torch.long)
         self.player = torch.zeros(self.num_agent, dtype=torch.int32)
-        self.position = torch.zeros((self.num_agent, self.action_size), dtype=torch.int32)
+        self.position = torch.zeros((self.num_agent, self.position_size), dtype=torch.int32)
         self.path = torch.zeros((self.num_agent, self.max_depth), dtype=torch.long)
         # Set up helper attributes
         self.table_order = torch.zeros(self.num_table, dtype=torch.long)
@@ -272,7 +272,7 @@ class SearchEngine:
         counts = (0.01 * self.tree.count[table.view(-1, 1), root_children]) ** 5.0
         actions = self.tree.action[table.view(-1, 1), root_children]
         probs = counts / torch.sum(counts, dim=1, keepdim=True)
-        move_policy = torch.zeros((self.num_table, self.action_size), dtype=torch.float32)
+        move_policy = torch.zeros((self.num_table, self.position_size), dtype=torch.float32)
         move_policy[table.view(-1, 1), actions] = probs
         # print(torch.round(100.0 * move_policy[0, :]))
         return move_policy, position_value

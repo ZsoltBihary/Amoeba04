@@ -24,9 +24,9 @@ class Trainer:
         Compute the custom loss as a combination of policy loss and value loss.
 
         Args:
-            logit: Predicted logits from the model, shape (batch_size, action_size)
+            logit: Predicted logits from the model, shape (batch_size, position_size)
             state_value: Predicted state value from the model, shape (batch_size,)
-            target_policy: Target policy distribution, shape (batch_size, action_size)
+            target_policy: Target policy distribution, shape (batch_size, position_size)
             target_state_value: Target state value, shape (batch_size,)
 
         Returns:
@@ -61,9 +61,9 @@ class Trainer:
             epoch_loss = 0.0
             for batch_idx, (state, target_policy, target_state_value) in enumerate(train_loader):
                 # Move data to the same CUDA_device as the model
-                state = state.to(self.model.CUDA_device)
-                target_policy = target_policy.to(self.model.CUDA_device)
-                target_state_value = target_state_value.to(self.model.CUDA_device)
+                state = state.to(self.model.device)
+                target_policy = target_policy.to(self.model.device)
+                target_state_value = target_state_value.to(self.model.device)
 
                 # Forward pass
                 logit, state_value = self.model(state)

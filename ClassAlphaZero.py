@@ -53,15 +53,15 @@ class AlphaZero:
 
         # Set up parameters
         self.num_table = args.get('num_table')
-        self.max_move_idx = game.action_size + 1
-        self.action_size = game.action_size
+        self.max_move_idx = game.position_size + 1
+        self.position_size = game.position_size
         self.trainer_buffer_capacity = args.get('trainer_buffer_capacity')
         # self.CUDA_device = args.get('CUDA_device')
         self.num_moves = args.get('num_moves')  # This is the total number of moves during the simulation
 
         self.search_engine = SearchEngine(args, game, evaluator)
-        self.play_history = PlayHistory(self.num_table, self.action_size+1, self.action_size)
-        self.trainer_buffer = TrainerBuffer(self.trainer_buffer_capacity, self.action_size)
+        self.play_history = PlayHistory(self.num_table, self.position_size+1, self.position_size)
+        self.trainer_buffer = TrainerBuffer(self.trainer_buffer_capacity, self.position_size)
         self.trainer = Trainer(evaluator.model, self.trainer_buffer)
 
         self.next_move_idx = torch.zeros(self.num_table, dtype=torch.long)
@@ -70,8 +70,8 @@ class AlphaZero:
         self.k_move_select[: 10] = 10
         self.all_table = torch.arange(self.num_table)
         self.player = torch.zeros(self.num_table, dtype=torch.int32)
-        self.position = torch.zeros((self.num_table, self.action_size), dtype=torch.int32)
-        # self.policy = torch.zeros((self.num_table, self.action_size), dtype=torch.float32)
+        self.position = torch.zeros((self.num_table, self.position_size), dtype=torch.int32)
+        # self.policy = torch.zeros((self.num_table, self.position_size), dtype=torch.float32)
         # self.value = torch.zeros(self.num_table, dtype=torch.float32)
 
     def set_start_positions(self, tables):
