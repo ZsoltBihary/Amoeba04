@@ -19,7 +19,7 @@ args = {
     'num_child': 40,
     'num_table': 1,
     'num_agent': 1000,
-    'num_moves': 5,
+    'num_moves': 40,
     'leaf_buffer_capacity': 20000,
     'eval_batch_size': 800,
     'res_channels': 32,
@@ -40,13 +40,14 @@ evaluator = Evaluator(args, game, terminal_check, model)
 engine = SearchEngine(args, game, evaluator)
 
 player = -torch.ones(args.get('num_table'), dtype=torch.int32)
-position = game.get_random_positions(n_state=args.get('num_table'), n_plus=2, n_minus=0)
+position = game.get_random_positions(n=args.get('num_table'), n_plus=2, n_minus=0)
 table = torch.arange(args.get('num_table'))
 
 # Let us monitor a little bit of gameplay ...
+game.print_board(position[0])
 for i in range(args.get('num_moves')):
     print(i)
-    game.print_board(position[0])
+
     move_policy, position_value = engine.analyze(player, position)
 
     print("position value = ", position_value[0])
@@ -54,7 +55,6 @@ for i in range(args.get('num_moves')):
     move = torch.argmax(move_policy, dim=1)
     position[table, move] = player
     player *= -1
-    a = 42
-game.print_board(position[0])
+    game.print_board(position[0], move[0].item())
 
 a = 42

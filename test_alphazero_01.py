@@ -48,3 +48,4 @@ n_generated = args.get('num_table') * args.get('num_moves')
 print(f"Positions generated: {n_generated:.0f}")
 gen_per_minute = n_generated / elapsed_time
 print(f"Generated per minute: {gen_per_minute:.0f}")
+
