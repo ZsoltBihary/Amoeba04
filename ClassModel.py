@@ -2,21 +2,27 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from line_profiler_pycharm import profile
+from ClassAmoeba import Game
 
 
-class BiharyModel01(nn.Module):
-    def __init__(self, args: dict):
-        super(BiharyModel01, self).__init__()
+class Model(nn.Module):
+    def __init__(self, game: Game, core_model: nn.Module):
+        super().__init__()
+        self.game = game
+        self.core_model = core_model
+        # Direct handle to game.check_terminal. Let us see if it is necessary ...
+        self.check_terminal = game.check_terminal
 
-        # self.register_buffer('kernel', kernel)
-        # self.padding = padding
-        self.device = args.get('CUDA_device')
+    def forward(self, state):
+        encoded = self.game.encode(state)
+        policy, state_value = self.core_model(encoded)
+        return policy, state_value
 
-        self.to(self.device)
-
-    def forward(self, x):
-
-        return
+    def inference(self, state):
+        encoded = self.game.encode(state)
+        policy, state_value = self.core_model(encoded)
+        terminal_signal = self.game.check_terminal_encoded(encoded)
+        return policy, state_value, terminal_signal
 
 
 # class CustomConvLayer(nn.Module):

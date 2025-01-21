@@ -4,6 +4,22 @@ import torch.nn.functional as F
 from line_profiler_pycharm import profile
 
 
+class CoreModelTrivial(nn.Module):
+    def __init__(self, args: dict):
+        super().__init__()
+        self.device = args.get('CUDA_device')
+        self.board_size = args.get('board_size')
+        self.action_size = self.board_size ** 2
+        self.to(self.device)
+
+    @profile
+    def forward(self, encoded):
+        point_encoded, dir_encoded = encoded
+        logit = 99.9 * (point_encoded[:, 0, :, :].view(-1, self.action_size) -1.0)
+        value = torch.sum(dir_encoded, dim=(1, 2, 3, 4)) * 0.0
+        return logit, value
+
+
 class SimpleEncoder01:
     # Interprets board_zero, line_type (dead, -5, ..., +5)
     # Encodes board_zero + the statistics of line-types (-5, ..., +5) of the 20 lines at each square

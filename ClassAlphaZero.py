@@ -11,19 +11,19 @@ from line_profiler_pycharm import profile
 
 
 class PlayHistory:
-    def __init__(self, num_table, max_move, action_size):
+    def __init__(self, num_table, max_move, position_size):
 
         self.num_table = num_table
         self.max_move = max_move
-        self.action_size = action_size
+        self.position_size = position_size
 
         self.next_move = torch.zeros(self.num_table, dtype=torch.long)
 
         self.all_table = torch.arange(self.num_table)
 
         self.player = torch.zeros((self.num_table, self.max_move), dtype=torch.int32)
-        self.position = torch.zeros((self.num_table, self.max_move, self.action_size), dtype=torch.int32)
-        self.policy = torch.zeros((self.num_table, self.max_move, self.action_size), dtype=torch.float32)
+        self.position = torch.zeros((self.num_table, self.max_move, self.position_size), dtype=torch.int32)
+        self.policy = torch.zeros((self.num_table, self.max_move, self.position_size), dtype=torch.float32)
         self.value = torch.zeros((self.num_table, self.max_move), dtype=torch.float32)
 
     def empty(self, table):

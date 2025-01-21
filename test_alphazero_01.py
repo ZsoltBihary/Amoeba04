@@ -1,6 +1,6 @@
 import torch
 from ClassAmoeba import Amoeba
-from OldClassModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
+from ClassCoreModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
 # from ClassSearchEngine import SearchEngine
 from ClassEvaluator import Evaluator
 from ClassAlphaZero import AlphaZero
@@ -18,9 +18,9 @@ args = {
     'num_table': 100,
     'num_agent': 300,
     'leaf_buffer_capacity': 4000,
-    'eval_batch_size': 700,
-    'num_moves': 100,
-    'trainer_buffer_capacity': 2000,
+    'eval_batch_size': 300,
+    'num_moves': 50,
+    'trainer_buffer_capacity': 1600,
     'symmetry_used': False,
     'res_channels': 32,
     'hid_channels': 16,
@@ -48,4 +48,3 @@ n_generated = args.get('num_table') * args.get('num_moves')
 print(f"Positions generated: {n_generated:.0f}")
 gen_per_minute = n_generated / elapsed_time
 print(f"Generated per minute: {gen_per_minute:.0f}")
-

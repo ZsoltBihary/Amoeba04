@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from ClassAmoeba import Amoeba
-from OldClassModel import TerminalCheck01, DeepMindModel01, SimpleModel01
+from ClassCoreModel import TerminalCheck01, DeepMindModel01, SimpleModel01
 # from ClassEvaluator import EvaluationBuffer
 from torchinfo import summary
 from line_profiler_pycharm import profile

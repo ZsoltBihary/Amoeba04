@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from ClassLayers import soft_characteristic, DirectionalConvolution
+from ClassCoreModel import CoreModelTrivial
 
 
 class Game:
@@ -176,14 +177,14 @@ class Model(nn.Module):
 
     def forward(self, state):
         encoded = self.game.encode(state)
-        result = self.core_model(encoded)
-        return result
+        policy, state_value = self.core_model(encoded)
+        return policy, state_value
 
     def inference(self, state):
         encoded = self.game.encode(state)
-        result = self.core_model(encoded)
+        policy, state_value = self.core_model(encoded)
         terminal_signal = self.game.check_terminal_encoded(encoded)
-        return result, terminal_signal
+        return policy, state_value, terminal_signal
 
 
 if __name__ == "__main__":
@@ -194,9 +195,9 @@ if __name__ == "__main__":
         'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
         # 'CUDA_device': 'cpu',
     }
-    n = 1
+    n = 2
     my_game = Amoeba(args)
-    my_position = my_game.get_random_positions(n, 12, 12).to(dtype=torch.int32)
+    my_position = my_game.get_random_positions(n, 3, 3).to(dtype=torch.int32)
     my_player = torch.ones(n, dtype=torch.int32)
     my_game.print_board(my_position[0, :])
     # my_action = torch.ones(n, dtype=torch.long) * 6
@@ -211,5 +212,17 @@ if __name__ == "__main__":
     my_encoded = my_game.encode(my_state_CUDA)
     my_signal = my_game.check_terminal_encoded(my_encoded)
     print(my_signal)
+
+    my_core_model = CoreModelTrivial(args)
+    my_model = Model(my_game, my_core_model)
+
+    my_policy, my_state_value, my_terminal_signal = my_model.inference(my_state_CUDA)
+    print('my_policy: ', my_policy)
+    print('my_value: ', my_state_value)
+    print('my_terminal_signal', my_terminal_signal)
+
+    my_policy, my_state_value = my_model(my_state_CUDA)
+    print('my_policy: ', my_policy)
+    print('my_value: ', my_state_value)
 
     a = 42
