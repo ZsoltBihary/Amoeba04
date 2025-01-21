@@ -1,27 +1,29 @@
 import torch
 from ClassAmoeba import Amoeba
-from ClassCoreModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
+# from ClassCoreModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
+from ClassCoreModel import CoreModelTrivial
+from ClassModel import Model
 from ClassSearchEngine import SearchEngine
-from ClassEvaluator import Evaluator
+# from ClassEvaluator import Evaluator
 # from torchinfo import summary
 # from line_profiler_pycharm import profile
 # import time
 
 # Collect parameters in a dictionary
 args = {
-    'board_size': 15,
+    'board_size': 7,
     'win_length': 5,
     'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
     # 'CUDA_device': 'cpu',
     # 'num_leaf': 8,
     # 'num_branch': 2,
-    'num_MC': 50000,
-    'num_child': 40,
+    'num_MC': 4000,
+    'num_child': 30,
     'num_table': 1,
-    'num_agent': 1000,
-    'num_moves': 40,
-    'leaf_buffer_capacity': 20000,
-    'eval_batch_size': 800,
+    'num_agent': 100,
+    'num_moves': 50,
+    'leaf_buffer_capacity': 2000,
+    'eval_batch_size': 24,
     'res_channels': 32,
     'hid_channels': 16,
     'num_res': 4,
@@ -30,17 +32,14 @@ args = {
 }
 
 game = Amoeba(args)
-terminal_check = TerminalCheck01(args)
-# model = TrivialModel01(args)
-# model = TrivialModel02(args)
-model = SimpleModel01(args)
-# model = DeepMindModel01(args)
-model.eval()
-evaluator = Evaluator(args, game, terminal_check, model)
-engine = SearchEngine(args, game, evaluator)
+core_model = CoreModelTrivial(args)
+model = Model(game, core_model)
+# model.eval()
+# evaluator = Evaluator(args, game, terminal_check, model)
+engine = SearchEngine(args, model)
 
 player = -torch.ones(args.get('num_table'), dtype=torch.int32)
-position = game.get_random_positions(n=args.get('num_table'), n_plus=2, n_minus=0)
+position = game.get_random_positions(n=args.get('num_table'), n_plus=1, n_minus=0)
 table = torch.arange(args.get('num_table'))
 
 # Let us monitor a little bit of gameplay ...
@@ -53,8 +52,15 @@ for i in range(args.get('num_moves')):
     print("position value = ", position_value[0])
     # print("move policy:\n", torch.round(100 * move_policy[0, :].view(game.board_size, -1)))
     move = torch.argmax(move_policy, dim=1)
-    position[table, move] = player
-    player *= -1
+    game.move(position, player, move)
+    # position[table, move] = player
+    # player *= -1
+    terminal_state_value, is_terminal = (
+        model.check_EOG(game.calc_state(player, position).to(device=args.get('CUDA_device'))))
     game.print_board(position[0], move[0].item())
+    if is_terminal[0].item():
+        result_value = terminal_state_value.to(device='cpu') * player
+        print('Game over, result = ', result_value[0].item())
+        break
 
 a = 42

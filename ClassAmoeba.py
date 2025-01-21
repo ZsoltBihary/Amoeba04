@@ -14,9 +14,11 @@ class Game:
             config (dict): Configuration dictionary with game-specific parameters.
         """
         self.config = config
-        # self.board_size = config.get("board_size", 15)
-        # self.win_length = config.get("win_length", 5)
-        # self.CUDA_device = config.get("CUDA_device", "cpu")
+        self.board_size = config.get("board_size", 15)
+        self.position_size = self.board_size ** 2
+        self.action_size = self.board_size ** 2
+        self.win_length = config.get("win_length", 5)
+        self.CUDA_device = config.get("CUDA_device", "cpu")
 
     def calc_state(self, player, position):
         """
@@ -81,24 +83,11 @@ class Amoeba(Game):
         super().__init__(config)
         self.board_size = config.get("board_size", 15)
         self.position_size = self.board_size ** 2
-        # self.position_size = self.board_size ** 2
+        self.action_size = self.board_size ** 2
         self.win_length = config.get("win_length", 5)
         self.CUDA_device = config.get("CUDA_device", "cpu")
 
-        # TODO: This is legacy code, to be eliminated
-        # class Amoeba:
-        #     """Encapsulates the rules of a general Amoeba-type game"""
-        #     def __init__(self, args: dict):
-        #
-        #         self.args = args
-        #         self.board_size = self.args.get('board_size')
-        #         self.win_length = self.args.get('win_length')
-        #         self.position_size = self.board_size * self.board_size  # this is also the state size
-        #         self.symmetry_index, self.inv_symmetry_index = self.calculate_symmetry()
-        #         self.encoder = self.Encoder(args)
-
         self.symmetry_index, self.inv_symmetry_index = self.calculate_symmetry()
-        #         self.encoder = self.Encoder(args)
 
         self.stones = torch.tensor([0.0, 1.0, -1.0], dtype=torch.float32, device=self.CUDA_device)
         # This helper custom CNN layer is used in self.encode to sum stones over lines in four directions
