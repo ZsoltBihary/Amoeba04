@@ -14,20 +14,18 @@ args = {
     'win_length': 5,
     'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
     # 'CUDA_device': 'cpu',
-    # 'num_leaf': 8,
-    # 'num_branch': 2,
-    'num_MC': 5000,
+    'num_MC': 2000,
     'num_child': 30,
     'num_table': 1,
     'num_agent': 100,
     'num_moves': 250,
     'leaf_buffer_capacity': 2000,
     'eval_batch_size': 32,
-    'res_channels': 32,
-    'hid_channels': 16,
-    'num_res': 4,
-    'policy_hid_channels': 32,
-    'value_hid_dim': 64
+    # 'res_channels': 32,
+    # 'hid_channels': 16,
+    # 'num_res': 4,
+    # 'policy_hid_channels': 32,
+    # 'value_hid_dim': 64
 }
 
 game = Amoeba(args)

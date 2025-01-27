@@ -38,4 +38,4 @@ state_CUDA = (player.view(-1, 1) * position).to(dtype=torch.float32, device=args
 # print(logit_int)
 # print(value[0])
 
-summary(model, input_data=state_CUDA, verbose=1)
+summary(model, input_data=state_CUDA, verbose=2)

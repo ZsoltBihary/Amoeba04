@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
-from ClassTrainerBuffer import TrainerBuffer
+from TrainerBuffer import TrainerBuffer
 
 
 class Trainer:
@@ -82,6 +82,7 @@ class Trainer:
             # Print epoch loss for monitoring
             print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss / len(train_loader)}")
 
+# TODO: Delete this ...
 # ********************* MY OLD IMPLEMENTATION **********************************
 # import torch
 # import torch.nn as nn

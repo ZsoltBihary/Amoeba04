@@ -1,14 +1,9 @@
 import torch
-from Amoeba import Amoeba
-# from ClassModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
 from Model import Model
 from SearchEngine import SearchEngine
-# from ClassEvaluator import Evaluator
-from ClassTrainerBuffer import TrainerBuffer
-from ClassTrainer import Trainer
-# from torchinfo import summary
+from TrainerBuffer import TrainerBuffer
+from Trainer import Trainer
 from line_profiler_pycharm import profile
-# import time
 
 
 class PlayHistory:
@@ -69,7 +64,7 @@ class AlphaZero:
         self.next_move_idx = torch.zeros(self.num_table, dtype=torch.long)
         # Precalculate how many best moves are considered ...
         self.k_move_select = torch.ones(self.max_move_idx, dtype=torch.int32)
-        self.k_move_select[: 10] = 10
+        self.k_move_select[: 10] = 5
         self.all_table = torch.arange(self.num_table)
         self.player = torch.zeros(self.num_table, dtype=torch.int32)
         self.position = torch.zeros((self.num_table, self.position_size), dtype=torch.int32)
