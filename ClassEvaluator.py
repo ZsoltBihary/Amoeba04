@@ -7,6 +7,8 @@ from line_profiler_pycharm import profile
 # from helper_functions import unique, duplicate_indices
 
 
+# TODO: Phase this out ...
+
 class Evaluator:
     def __init__(self, args: dict, game, terminal_check, model):
         self.args = args

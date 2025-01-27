@@ -1,47 +1,30 @@
 import torch
 from line_profiler_pycharm import profile
 
-import torch
 
-
-def soft_one_hot2d(input, num_classes, sharpness=3.0):
+def soft_characteristic(x, centers, accuracy=0.01):
     """
-    Approximates one-hot encoding using softmax with a sharpness factor,
-    with the class dimension placed at the second (channel) index of the output tensor.
+    Computes a soft characteristic encoding of the input tensor relative to the given centers.
+    For each element in the input tensor, a value close to 1 is assigned to the closest center,
+    and values near 0 are assigned elsewhere.
+
+    The sharpness of the soft Dirac delta function is controlled by the `accuracy` parameter, which
+    defines the width of the peak.
 
     Args:
-        input (torch.Tensor): Input tensor (float values), shape (N, H, W).
-        num_classes (int): Number of classes for the one-hot encoding.
-        sharpness (float): Scaling factor to control the sharpness of the approximation.
+        x (torch.Tensor): Input tensor with arbitrary shape, dtype=torch.float32.
+        centers (torch.Tensor): 1D tensor of float32 values representing class centers.
+        accuracy (float): Controls the width of the soft Dirac delta function. Default is 0.01.
+                          Smaller values result in sharper peaks.
 
     Returns:
-        torch.Tensor: Soft one-hot encoded tensor with the class dimension at the second (channel) index.
+        torch.Tensor: Soft characteristic encoding tensor with shape (*x.shape, len(centers)).
     """
-    # Compute distances to each class index
-    distances = torch.abs(input.unsqueeze(-1) - torch.arange(num_classes, device=input.device, dtype=input.dtype))
+    # Compute the distances between each input element and the centers
+    distances = x.unsqueeze(-1) - centers  # Shape: (*x.shape, len(centers))
+    # Apply the soft Dirac delta function with accuracy-based scaling
+    return 1.0 / (1.0 + (distances / accuracy) ** 4)
 
-    # Apply softmax with sharpness scaling
-    weights = torch.softmax(-sharpness * distances, dim=-1)
-
-    # Use permute with explicit numeric parameters to move the class dimension to the second index
-    # Shape before: (N, H, W, num_classes)
-    # We want the output to be (N, num_classes, H, W)
-    weights = weights.permute(0, 3, 1, 2)  # (N, num_classes, H, W)
-
-    return weights
-
-
-if __name__ == "__main__":
-    # TODO: Needs testing
-    # Example 1: Shape (N, H, W), class dimension at the second (channel) index
-    input_tensor_1 = torch.tensor([[[0.5, 2.0], [1.5, 3.0]], [[0.3, 2.3], [1.2, 4.0]]]).float()
-    num_classes = 10  # Number of classes
-    sharpness = 3.0  # Scaling factor
-
-    # Apply soft one-hot approximation (channel-specific)
-    soft_one_hot_1 = soft_one_hot2d(input_tensor_1, num_classes, sharpness)
-    print("Soft One-Hot Approximation (Shape: N, C, H, W):")
-    print(soft_one_hot_1.shape)  # Expected shape: (N, num_classes, H, W)
 
 @profile
 def helper_unique(x, dim=None):

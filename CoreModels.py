@@ -1,7 +1,87 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+# from ClassLayers import DirectionalConvolution
+from CustomLayers import Dir2DirSum, Dir2PointConv2D
 from line_profiler_pycharm import profile
+
+
+class FormatDirectionalInput(nn.Module):
+    def __init__(self, args: dict, combine=False):
+        super().__init__()
+        self.combine = combine
+        self.device = args.get('CUDA_device')
+        self.board_size = args.get('board_size')
+        self.action_size = self.board_size ** 2
+        self.to(self.device)
+
+    def forward(self, encoded):
+        point_encoded, dir_encoded = encoded
+        # point_encoded: Tensor(N, 3, board_size, board_size)
+        # dir_encoded: Tensor(N, 4, 11, board_size, board_size)
+        dir_encoded = dir_encoded[:, :, 1: -1, :, :]
+        # dir_encoded: Tensor(N, 4, 9, board_size, board_size)
+        if self.combine:
+            dir_encoded = torch.cat([point_encoded.unsqueeze(1).repeat(1, 4, 1, 1, 1), dir_encoded], dim=2)
+        # reshape by stacking the 4 directions into a grouped channel dimension ...
+        new_shape = (dir_encoded.shape[0], dir_encoded.shape[1] * dir_encoded.shape[2],
+                     dir_encoded.shape[3], dir_encoded.shape[4])
+        dir_input = dir_encoded.reshape(new_shape)
+
+        return dir_input
+
+
+class CoreModelSimple01(nn.Module):
+    def __init__(self, args: dict):
+        super().__init__()
+        self.args = args
+        self.device = args.get('CUDA_device')
+        self.board_size = args.get('board_size')
+        self.action_size = self.board_size ** 2
+        self.win_length = args.get('win_length')
+
+        self.format_dir_input = FormatDirectionalInput(args, combine=False)
+
+        self.line_type_size = 2 * self.win_length - 1
+        self.sum_lines = Dir2DirSum(self.line_type_size, self.win_length, self.device)
+
+        logit_par = [18.17, 6.13, 1.98, 0.45, -0.02, 0.89, 2.49, 8.43, 23.64]
+        value_par = [-1.37, -0.11, -0.07, -0.05, 0.0, 0.04, 0.07, 0.27, 3.05]
+
+        weight_kernel = torch.tensor([logit_par, value_par], dtype=torch.float32).unsqueeze(2).repeat(1, 1, 5)
+
+        self.weight_conv = Dir2PointConv2D(in_channels_per_dir=self.line_type_size,
+                                           out_channels=2,
+                                           kernel_size=self.win_length,
+                                           para_kernel_init=weight_kernel,
+                                           diag_kernel_init=weight_kernel)
+        # DirectionalConvolution(self.line_type_size, 2,
+        #                                           1, weight)
+
+        # policy_logit_tensor = torch.tensor(policy_logit_par, dtype=torch.float32)
+        # value_plus_tensor = torch.tensor(value_plus_par, dtype=torch.float32)
+        # value_minus_tensor = torch.tensor(value_minus_par, dtype=torch.float32)
+        # self.policy_logit_w = nn.Parameter(policy_logit_tensor)
+        # self.value_plus_w = nn.Parameter(value_plus_tensor)
+        # self.value_minus_w = nn.Parameter(value_minus_tensor)
+        self.to(self.device)
+
+    @profile
+    def forward(self, encoded):
+        point_encoded, dir_encoded = encoded
+        dir_input = self.format_dir_input(encoded)
+        sum_input = self.sum_lines(dir_input)
+        output = self.weight_conv(sum_input)
+        # So far so good ...
+        logit = output[:, 0, ...] + 100.0 * (point_encoded[:, 0, ...] - 1.0)
+        logit = logit.reshape(logit.shape[0], -1)
+        attention = torch.softmax(logit, dim=1)
+        value = output[:, 1, ...]
+        value = value.reshape(logit.shape[0], -1)
+        state_value = torch.einsum('ij,ij->i', attention, value)
+        state_value = torch.tanh(state_value)
+
+        return logit, state_value
 
 
 class CoreModelTrivial(nn.Module):
@@ -15,11 +95,52 @@ class CoreModelTrivial(nn.Module):
     @profile
     def forward(self, encoded):
         point_encoded, dir_encoded = encoded
-        logit = 99.9 * (point_encoded[:, 0, :, :].view(-1, self.action_size) -1.0)
+        logit = 99.9 * (point_encoded[:, 0, :, :].view(-1, self.action_size) - 1.0)
         value = torch.sum(dir_encoded, dim=(1, 2, 3, 4)) * 0.0
         return logit, value
 
 
+# *************** THIS IS OLD CODE FOR SimpleModel01 ...  *******************************************
+        # encoded_input = self.encoder.encode(board_zero, line_type)
+        #
+        # # def forward(self, encoded_input):
+        # # At this point, this model basically implements the logit and value heads ...
+        # # So let us pretend we had some (RESNET) feature processing already,
+        # #   resulting in x with the same shape as the encoded_input ...
+        #
+        # x = encoded_input[:, 1:, ...]
+        # # The heads work with flattened x,
+        # #   so we convert the last two dimensions from 2d board representation to 1d state representation ...
+        # x = x.reshape(x.shape[0], x.shape[1], -1)
+        # state_zero = encoded_input[:, 0, ...].reshape(x.shape[0], -1)
+        # x_minus = x[:, 0:6, ...]
+        # x_plus = x[:, 5:11, ...]
+        # # b_size = x.shape[0]
+        # policy_logit = torch.einsum('bfi,f->bi', x, self.policy_logit_w) + 10000.0 * state_zero - 10000.0
+        # # flat_policy_logit = policy_logit.reshape((b_size, -1))
+        #
+        # policy = torch.softmax(policy_logit, dim=1) * state_zero
+        # policy = F.normalize(policy, p=1, dim=1)
+        # # print("sum(logit) = ", torch.sum(logit, dim=1))
+        # # logit is an estimation for the action probabilities played by the first player ...
+        # # Here we estimate the action probabilities p_j played by the second player ...
+        # p_i = torch.clamp(policy, max=0.99)
+        # odds_i = p_i / (1.0 - p_i)
+        # sum_odds = torch.sum(odds_i, dim=1, keepdim=True)
+        # sum_odds_not_i = sum_odds - odds_i
+        # p_j = p_i * sum_odds_not_i
+        # # print("sum(p_j)", torch.sum(p_j, dim=1))
+        # point_value_plus = (torch.einsum('bfi,f->bi', x_plus, self.value_plus_w)) * p_i
+        # point_value_minus = (torch.einsum('bfi,f->bi', x_minus, self.value_minus_w)) * p_j
+        # value = torch.sum(point_value_plus + point_value_minus, dim=1)
+        # value = torch.tanh(value)
+        #
+        # return policy_logit, value
+
+# ******************************* OLD STUFF *******************************************
+# ******************************* OLD STUFF *******************************************
+# ******************************* OLD STUFF *******************************************
+#
 # class SimpleEncoder01:
 #     # Interprets board_zero, line_type (dead, -5, ..., +5)
 #     # Encodes board_zero + the statistics of line-types (-5, ..., +5) of the 20 lines at each square

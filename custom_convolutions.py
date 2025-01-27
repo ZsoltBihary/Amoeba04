@@ -1,11 +1,90 @@
-# TODO: This is just a library of old ideas for now...
-#   Eventually phase it out ...
-
-
-# import torch
+import torch
 # import torch.nn as nn
-# import torch.nn.functional as F
-#
+import torch.nn.functional as F
+from line_profiler_pycharm import profile
+
+# This is a collection of custom convolutions implemented in functional form, based on F.conv2d()
+# For custom convolutional layers, implemented as nn.modules, see the file CustomLayers.py
+
+
+@profile
+def dir2dir_conv2d(dir_input, para_kernel, diag_kernel, kernel_size):
+    # dir_inputs.shape : (N, 4 * in_channels_per_dir, board_size, board_size)
+    # para_kernel.shape : (out_channels_per_dir, in_channels_per_dir, kernel_size)
+    # diag_kernel.shape : (out_channels_per_dir, in_channels_per_dir, kernel_size)
+    half_k = kernel_size // 2
+    # Horizontal Convolution Kernel (Expand and pad)
+    kernel_h = para_kernel.unsqueeze(-2)
+    kernel_h = F.pad(kernel_h, pad=(0, 0, half_k, half_k))
+    # Vertical Convolution Kernel (Expand and pad)
+    kernel_v = para_kernel.unsqueeze(-1)
+    kernel_v = F.pad(kernel_v, pad=(half_k, half_k, 0, 0))
+    # Diagonal Convolution Kernel (Using diag_embed)
+    kernel_d = torch.diag_embed(diag_kernel)
+    # Anti-Diagonal Convolution Kernel (Flip the diagonal kernel)
+    kernel_a = torch.flip(kernel_d, dims=[-1])
+    # Each kernel_*.shape: (out_channels_per_dir, in_channels_per_dir, kernel_size, kernel_size)
+    kernels = torch.cat([kernel_h, kernel_v, kernel_d, kernel_a], dim=0)
+    # kernels.shape: (4 * out_channels_per_dir, in_channels_per_dir, kernel_size, kernel_size)
+    dir_output = F.conv2d(dir_input, kernels, padding=half_k, groups=4)
+    # dir_output.shape : (N, 4 * out_channels_per_dir, board_size, board_size)
+    return dir_output
+
+
+@profile
+def dir2point_conv2d(dir_input, para_kernel, diag_kernel, kernel_size):
+    # dir_inputs.shape : (N, 4 * in_channels_per_dir, board_size, board_size)
+    # para_kernel.shape : (out_channels, in_channels_per_dir, kernel_size)
+    # diag_kernel.shape : (out_channels, in_channels_per_dir, kernel_size)
+    half_k = kernel_size // 2
+    # Horizontal Convolution Kernel (Expand and pad)
+    kernel_h = para_kernel.unsqueeze(-2)
+    kernel_h = F.pad(kernel_h, pad=(0, 0, half_k, half_k))
+    # Vertical Convolution Kernel (Expand and pad)
+    kernel_v = para_kernel.unsqueeze(-1)
+    kernel_v = F.pad(kernel_v, pad=(half_k, half_k, 0, 0))
+    # Diagonal Convolution Kernel (Using diag_embed)
+    kernel_d = torch.diag_embed(diag_kernel)
+    # Anti-Diagonal Convolution Kernel (Flip the diagonal kernel)
+    kernel_a = torch.flip(kernel_d, dims=[-1])
+    # Each kernel_*.shape: (out_channels, in_channels_per_dir, kernel_size, kernel_size)
+    kernels = torch.cat([kernel_h, kernel_v, kernel_d, kernel_a], dim=1)
+    # kernels.shape: (out_channels, 4 * in_channels_per_dir, kernel_size, kernel_size)
+    point_output = F.conv2d(dir_input, kernels, padding=half_k, groups=1)
+    # dir_output.shape : (N, 4 * out_channels_per_dir, board_size, board_size)
+    return point_output
+
+
+@profile
+def point2dir_conv2d(point_input, para_kernel, diag_kernel, kernel_size):
+    # point_inputs.shape : (N, in_channels, board_size, board_size)
+    # para_kernel.shape : (out_channels_per_dir, in_channels, kernel_size)
+    # diag_kernel.shape : (out_channels_per_dir, in_channels, kernel_size)
+
+    dir_output = dir2dir_conv2d(point_input.repeat(1, 4, 1, 1), para_kernel, diag_kernel, kernel_size)
+    # dir_output.shape : (N, 4 * out_channels_per_dir, board_size, board_size)
+    return dir_output
+
+
+if __name__ == "__main__":
+    num_iter, N = 100, 1000
+    in_per_dir = 9
+    out_per_dir = 8
+    b_size = 15
+    k = 3
+
+    dir_inputs = torch.ones((N, 4 * in_per_dir, b_size, b_size), dtype=torch.float32)
+    par_kernel = torch.ones((out_per_dir, in_per_dir, k), dtype=torch.float32)
+    dia_kernel = torch.ones((out_per_dir, in_per_dir, k), dtype=torch.float32)
+    p_inputs = torch.ones((N, in_per_dir, b_size, b_size), dtype=torch.float32)
+
+    for i in range(num_iter):
+        print(i)
+        dir_outputs = dir2dir_conv2d(dir_inputs, par_kernel, dia_kernel, k)
+        p2dir_outputs = point2dir_conv2d(p_inputs, par_kernel, dia_kernel, k)
+        dir2p_outputs = dir2point_conv2d(dir_inputs, par_kernel, dia_kernel, k)
+
+
 #
 # class HorizontalConvolution(nn.Module):
 #     def __init__(self, input_channel, output_channel, kernel_size, kernel_tensor):

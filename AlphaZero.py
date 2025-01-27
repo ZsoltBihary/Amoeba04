@@ -1,8 +1,9 @@
 import torch
 from Amoeba import Amoeba
 # from ClassModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
+from Model import Model
 from SearchEngine import SearchEngine
-from ClassEvaluator import Evaluator
+# from ClassEvaluator import Evaluator
 from ClassTrainerBuffer import TrainerBuffer
 from ClassTrainer import Trainer
 # from torchinfo import summary
@@ -46,26 +47,27 @@ class PlayHistory:
 
 
 class AlphaZero:
-    def __init__(self, args: dict, game: Amoeba, evaluator: Evaluator):
+    def __init__(self, args: dict, model: Model):
         self.args = args
-        self.game = game
-        self.evaluator = evaluator
+        self.model = model
+        self.game = model.game
+        # self.evaluator = evaluator
 
         # Set up parameters
         self.num_table = args.get('num_table')
-        self.max_move_idx = game.position_size + 1
-        self.position_size = game.position_size
+        self.max_move_idx = self.game.position_size + 1
+        self.position_size = self.game.position_size
         self.trainer_buffer_capacity = args.get('trainer_buffer_capacity')
-        # self.CUDA_device = args.get('CUDA_device')
+        self.CUDA_device = args.get('CUDA_device')
         self.num_moves = args.get('num_moves')  # This is the total number of moves during the simulation
 
-        self.search_engine = SearchEngine(args, game, evaluator)
+        self.search_engine = SearchEngine(args, model)
         self.play_history = PlayHistory(self.num_table, self.position_size+1, self.position_size)
         self.trainer_buffer = TrainerBuffer(self.trainer_buffer_capacity, self.position_size)
-        self.trainer = Trainer(evaluator.model, self.trainer_buffer)
+        self.trainer = Trainer(model, self.trainer_buffer)
 
         self.next_move_idx = torch.zeros(self.num_table, dtype=torch.long)
-        # TODO: Precalculate how many best moves are considered ...
+        # Precalculate how many best moves are considered ...
         self.k_move_select = torch.ones(self.max_move_idx, dtype=torch.int32)
         self.k_move_select[: 10] = 10
         self.all_table = torch.arange(self.num_table)
@@ -79,7 +81,7 @@ class AlphaZero:
         if n_table == 0:
             return
         self.play_history.empty(tables)
-
+        # TODO: Make this general in Game class ...
         self.position[tables] = self.game.get_random_positions(n_table, n_plus=1, n_minus=0)
         self.player[tables] = -1
         self.next_move_idx[tables] = 0
@@ -107,6 +109,7 @@ class AlphaZero:
         state_value = player * est_value
         # DONE: This is the place to extend data to symmetric equivalent states ...
         if self.args.get('symmetry_used'):
+            # TODO: Make this general in Game class ...
             state_sym = self.game.get_symmetry_states(state)
             policy_sym = self.game.get_symmetry_states(policy)
             state_value_sym = state_value.repeat(8)
@@ -117,8 +120,52 @@ class AlphaZero:
         return
 
     def check_EOG(self):
-        states = self.player.view(-1, 1) * self.position
-        state_values, terminal = self.evaluator.check_EOG(states)
+
+        # NEW VERSION:
+        # def check_EOG(self, state):
+        #     with (torch.no_grad()):
+        #         encoded = self.game.encode(state)
+        #         # policy, state_value = self.core_model(encoded)
+        #         plus_mask, minus_mask, draw_mask = self.game.check_terminal_encoded(encoded)
+        #         terminal_state_value = plus_mask.to(dtype=torch.float32) - minus_mask.to(dtype=torch.float32)
+        #         is_terminal = plus_mask | minus_mask | draw_mask
+        #         # term = is_terminal.to(dtype=torch.float32)
+        #         # state_value = term * terminal_state_value
+        #     return terminal_state_value, is_terminal
+
+        # OLD VERSION:
+        # state_values, terminal = self.evaluator.check_EOG(states)
+
+        # def check_EOG(self, state):
+        #
+        #     state_CUDA = state.to(device=self.CUDA_device, dtype=torch.float32, non_blocking=True)
+        #     with torch.no_grad():
+        #         term_indicator_CUDA = self.terminal_check(state_CUDA)
+        #         # result_CUDA = self.model(states_CUDA)
+        #
+        #     term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=False)
+        #     # logit = result_CUDA[0].to(CUDA_device='cpu', non_blocking=False)
+        #     # value = result_CUDA[1].to(CUDA_device='cpu', non_blocking=False)
+        #     # Interpret result ...
+        #     dir_max = term_indicator[:, 0]
+        #     dir_min = term_indicator[:, 1]
+        #     sum_abs = term_indicator[:, 2]
+        #     plus_mask = (dir_max + 0.1 > self.game.win_length)
+        #     minus_mask = (dir_min - 0.1 < -self.game.win_length)
+        #     draw_mask = (sum_abs + 0.1 > self.game.position_size)
+        #     state_value = torch.zeros(state.shape[0], dtype=torch.float32)
+        #     state_value[draw_mask] = 0.0
+        #     state_value[plus_mask] = 1.0
+        #     state_value[minus_mask] = -1.0
+        #     terminal_mask = plus_mask | minus_mask | draw_mask
+        #
+        #     return state_value, terminal_mask
+
+        states_CUDA = (self.player.view(-1, 1) * self.position).to(device=self.CUDA_device, dtype=torch.float32)
+        state_values_CUDA, terminal_CUDA = self.model.check_EOG(states_CUDA)
+        state_values = state_values_CUDA.to(device='cpu', non_blocking=False)
+        terminal = terminal_CUDA.to(device='cpu', non_blocking=False)
+
         if not torch.any(terminal):
             return
         terminated_tables = self.all_table[terminal]
@@ -153,8 +200,10 @@ class AlphaZero:
                 best_probs = best_pol / torch.sum(best_pol)
                 idx = torch.multinomial(best_probs, num_samples=1)
                 move_action = best_actions[idx]
-            self.position[table_idx, move_action] = self.player[table_idx]
 
+            # TODO: Make it general with game.move ...
+            self.position[table_idx, move_action] = self.player[table_idx]
+        # TODO: Make it general with game.move ...
         self.player *= -1
         self.next_move_idx += 1
         return
@@ -183,7 +232,7 @@ class AlphaZero:
             if self.trainer_buffer.data_count > self.trainer_buffer_capacity // 4:
                 print('Training begins ...')
                 self.trainer.improve_model()
-                for name, param in self.evaluator.model.named_parameters():
+                for name, param in self.model.named_parameters():
                     print(f"Parameter name: {name}")
                     print(f"Parameter value: {param}")
 

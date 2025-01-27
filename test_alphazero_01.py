@@ -1,6 +1,6 @@
 import torch
-from ClassAmoeba import Amoeba
-from ClassCoreModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
+from Amoeba import Amoeba
+from CoreModels import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
 # from ClassSearchEngine import SearchEngine
 from ClassEvaluator import Evaluator
 from ClassAlphaZero import AlphaZero

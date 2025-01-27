@@ -1,29 +1,28 @@
 import torch
-from ClassAmoeba import Amoeba
+from Amoeba import Amoeba
 # from ClassCoreModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
-from ClassCoreModel import CoreModelTrivial
-from ClassModel import Model
-from ClassSearchEngine import SearchEngine
-# from ClassEvaluator import Evaluator
+from CoreModels import CoreModelTrivial, CoreModelSimple01
+from Model import Model
+from SearchEngine import SearchEngine
 # from torchinfo import summary
 # from line_profiler_pycharm import profile
 # import time
 
 # Collect parameters in a dictionary
 args = {
-    'board_size': 7,
+    'board_size': 15,
     'win_length': 5,
     'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
     # 'CUDA_device': 'cpu',
     # 'num_leaf': 8,
     # 'num_branch': 2,
-    'num_MC': 4000,
+    'num_MC': 5000,
     'num_child': 30,
     'num_table': 1,
     'num_agent': 100,
-    'num_moves': 50,
+    'num_moves': 250,
     'leaf_buffer_capacity': 2000,
-    'eval_batch_size': 24,
+    'eval_batch_size': 32,
     'res_channels': 32,
     'hid_channels': 16,
     'num_res': 4,
@@ -32,10 +31,9 @@ args = {
 }
 
 game = Amoeba(args)
-core_model = CoreModelTrivial(args)
+# core_model = CoreModelTrivial(args)
+core_model = CoreModelSimple01(args)
 model = Model(game, core_model)
-# model.eval()
-# evaluator = Evaluator(args, game, terminal_check, model)
 engine = SearchEngine(args, model)
 
 player = -torch.ones(args.get('num_table'), dtype=torch.int32)
@@ -56,7 +54,7 @@ for i in range(args.get('num_moves')):
     # position[table, move] = player
     # player *= -1
     terminal_state_value, is_terminal = (
-        model.check_EOG(game.calc_state(player, position).to(device=args.get('CUDA_device'))))
+        model.check_EOG((player.view(-1, 1) * position).to(dtype=torch.float32, device=args.get('CUDA_device'))))
     game.print_board(position[0], move[0].item())
     if is_terminal[0].item():
         result_value = terminal_state_value.to(device='cpu') * player

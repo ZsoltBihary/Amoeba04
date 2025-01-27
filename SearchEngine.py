@@ -2,11 +2,11 @@ import torch
 # import torch.nn as nn
 # import torch.nn.functional as F
 # from typing import Tuple
+from Model import Model
 from ClassSearchBuffer import SearchBufferManager
 from ClassSearchTree import SearchTree
 from line_profiler_pycharm import profile
 # from helper_functions import unique, duplicate_indices
-from ClassModel import Model
 
 
 class SearchEngine:

@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ClassLayers import soft_characteristic, DirectionalConvolution
+from helper_functions import soft_characteristic
+from CustomLayers import Point2DirSum
 
 
 # TODO: Copied from base_class_design10.py
@@ -20,6 +21,7 @@ class Game:
         self.win_length = config.get("win_length", 5)
         self.CUDA_device = config.get("CUDA_device", "cpu")
 
+    # TODO: I will not use this method, it is too cumbersome ... Phase it out ...
     def calc_state(self, player, position):
         """
         Calculate the game states. It is defined as state = player * position.
@@ -90,10 +92,14 @@ class Amoeba(Game):
         self.symmetry_index, self.inv_symmetry_index = self.calculate_symmetry()
 
         self.stones = torch.tensor([0.0, 1.0, -1.0], dtype=torch.float32, device=self.CUDA_device)
+
         # This helper custom CNN layer is used in self.encode to sum stones over lines in four directions
-        sum_kernel = torch.ones(3, device=self.CUDA_device).diag_embed().unsqueeze(2).repeat(1, 1, self.win_length)
-        self.sum_conv = DirectionalConvolution(3, 3,
-                                               self.win_length, sum_kernel)
+        # sum_kernel = torch.ones(3, device=self.CUDA_device).diag_embed().unsqueeze(2).repeat(1, 1, self.win_length)
+        # self.sum_conv = DirectionalConvolution(3, 3,
+        #                                        self.win_length, sum_kernel)
+
+        self.sum_conv = Point2DirSum(3, self.win_length, self.CUDA_device)
+
         # This helper tensor encodes the type of lines with length win_length. E.g., if win_length = 5, then
         # -5: 5 white stones,
         # -4: 4 white stones + 1 empty,
@@ -152,7 +158,7 @@ class Amoeba(Game):
         board = state.view(state.shape[0], self.board_size, self.board_size)
         point_encoded = soft_characteristic(board, self.stones).permute(0, 3, 1, 2)
         # point_encoded: Tensor(N, 3, board_size, board_size)
-        dir_sum = self.sum_conv(point_encoded.repeat(1, 4, 1, 1))
+        dir_sum = self.sum_conv(point_encoded)
         dir_sum = dir_sum.permute(0, 2, 3, 1)
         dir_sum = dir_sum.reshape(*dir_sum.shape[:-1], 4, 3)
         diff = dir_sum[..., 1] - dir_sum[..., 2]
