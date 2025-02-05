@@ -110,35 +110,35 @@ class SearchEngine:
         return
 
     # TODO: Think again about splitting agents ... Commented out for now ...
-    # def split_agents(self, agent, table, child_node, depth_max):
-    #
-    #     passive_agent = self.all_agents[~self.active]
-    #     old_idx = torch.arange(agent.shape[0])[self.depth[agent] <= depth_max]
-    #     old_agent = agent[old_idx]
-    #     old_table = table[old_idx]
-    #     old_child_node = child_node[old_idx, :]
-    #     if passive_agent.shape[0] >= old_agent.shape[0]:
-    #         new_agent = passive_agent[: old_agent.shape[0]]
-    #         self.active[new_agent] = True
-    #         self.table[new_agent] = old_table
-    #
-    #         ucb_tensor = self.tree.ucb[old_table.view(-1, 1), old_child_node]
-    #         best_idx = torch.argmax(ucb_tensor, dim=1)
-    #         new_node2 = old_child_node[torch.arange(best_idx.shape[0]), best_idx]
-    #         # Lower ucb for best child to facilitate branching for consecutive paths ...
-    #         self.tree.ucb[old_table, new_node2] -= self.ucb_penalty
-    #
-    #         self.node[new_agent] = new_node2
-    #         # TODO: Make this general, based on the Amoeba class ...
-    #         new_action = self.tree.action[old_table, new_node2]
-    #         self.position[new_agent, :] = self.position[old_agent, :]
-    #         self.position[new_agent, new_action] = self.player[old_agent]
-    #         self.player[new_agent] = -self.player[old_agent]
-    #         self.path[new_agent, :] = self.path[old_agent, :]
-    #         self.path[new_agent, self.depth[old_agent]] = new_node2
-    #         self.depth[new_agent] = self.depth[old_agent] + 1
-    #
-    #     return
+    def split_agents(self, agent, table, child_node, depth_max):
+
+        passive_agent = self.all_agents[~self.active]
+        old_idx = torch.arange(agent.shape[0])[self.depth[agent] <= depth_max]
+        old_agent = agent[old_idx]
+        old_table = table[old_idx]
+        old_child_node = child_node[old_idx, :]
+        if passive_agent.shape[0] >= old_agent.shape[0]:
+            new_agent = passive_agent[: old_agent.shape[0]]
+            self.active[new_agent] = True
+            self.table[new_agent] = old_table
+
+            ucb_tensor = self.tree.ucb[old_table.view(-1, 1), old_child_node]
+            best_idx = torch.argmax(ucb_tensor, dim=1)
+            new_node2 = old_child_node[torch.arange(best_idx.shape[0]), best_idx]
+            # Lower ucb for best child to facilitate branching for consecutive paths ...
+            self.tree.ucb[old_table, new_node2] -= self.ucb_penalty
+
+            self.node[new_agent] = new_node2
+            # TODO: Make this general, based on the Amoeba class ...
+            new_action = self.tree.action[old_table, new_node2]
+            self.position[new_agent, :] = self.position[old_agent, :]
+            self.position[new_agent, new_action] = self.player[old_agent]
+            self.player[new_agent] = -self.player[old_agent]
+            self.path[new_agent, :] = self.path[old_agent, :]
+            self.path[new_agent, self.depth[old_agent]] = new_node2
+            self.depth[new_agent] = self.depth[old_agent] + 1
+
+        return
 
     @profile
     def update_agents(self):
@@ -159,14 +159,14 @@ class SearchEngine:
         # Lower ucb for best child to facilitate branching for consecutive paths ...
         self.tree.ucb[table, new_node] -= self.ucb_penalty
 
-        # TODO: Splitting for more than 1 table still does not work...
-        # if self.num_table == 1:
-        #     # Then split agents, speeding up gameplay ...
-        #     self.split_agents(agent, table, child_node, depth_max=4)
-        #     self.split_agents(agent, table, child_node, depth_max=8)
+        # TODO: Splitting for more than 1 table seems to work now ?!? ...
+        if self.num_table == 1:
+            # Then split agents, speeding up gameplay ...
+            self.split_agents(agent, table, child_node, depth_max=4)
+            self.split_agents(agent, table, child_node, depth_max=8)
         # Low depth nodes are split into 3, medium depth nodes are split into 2.
-        # else:
-        #     self.split_agents(agent, table, child_node, depth_max=3)
+        else:
+            self.split_agents(agent, table, child_node, depth_max=2)
 
         # Update agent attributes ...
         self.node[agent] = new_node
