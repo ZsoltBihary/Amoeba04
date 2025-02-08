@@ -16,7 +16,7 @@ class SearchEngine:
         self.num_child = args.get('num_child')
         self.num_MC = args.get('num_MC')
         self.num_agent = args.get('num_agent')
-        self.num_node = (self.num_MC + 200) * self.num_child
+        self.num_node = (self.num_MC + self.num_agent + 1000) * (self.num_child + 10)
         self.position_size = self.game.position_size
         self.max_depth = self.game.position_size + 1
         self.CUDA_device = args.get('CUDA_device')
@@ -50,7 +50,7 @@ class SearchEngine:
     def reset(self, root_player, root_position):
         self.buffer_mgr.reset()
         self.tree.reset()
-        # self.evaluator.model.eval()
+        self.model.eval()
         self.root_player[:] = root_player
         self.root_position[:, :] = root_position
         self.active[:] = False
@@ -193,10 +193,7 @@ class SearchEngine:
 
     @profile
     def batch_evaluate(self):
-        # TODO: Should calculate with game.calc_state() ? ...
         state = self.buffer_mgr.get_states()
-
-        # TODO: Should delegate these wrapper calculations to model.inference() ? ...
         state_CUDA = state.to(device=self.CUDA_device, dtype=torch.float32, non_blocking=True)
         logit_CUDA, state_value_CUDA, is_terminal_CUDA = self.model.inference(state_CUDA)
         logit = logit_CUDA.to(device='cpu', non_blocking=False)
@@ -257,11 +254,13 @@ class SearchEngine:
             self.back_propagate()
             self.update_ucb()
             # Monitor some quantities ... For testing ...
+            # mean_value = tensor
+            mean_MC = self.tree.count[:, 1].to(torch.float).mean()
             min_MC = torch.min(self.tree.count[:, 1])
             max_MC = torch.max(self.tree.count[:, 1])
             # print('minMC = ', min_MC.item(), ', maxMC = ', max_MC.item())
             # print(round(self.av_num_agent))
-            if min_MC > self.num_MC:
+            if mean_MC > self.num_MC:
                 break
         # Formulate output ...
         table = torch.arange(self.num_table)

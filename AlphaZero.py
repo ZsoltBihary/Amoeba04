@@ -46,7 +46,6 @@ class AlphaZero:
         self.args = args
         self.model = model
         self.game = model.game
-        # self.evaluator = evaluator
 
         # Set up parameters
         self.num_table = args.get('num_table')
@@ -96,7 +95,7 @@ class AlphaZero:
         # Compute iteratively going backwards
         for t in range(len(value) - 2, -1, -1):  # Start from the second-to-last element
             av_value[t] = alpha * value[t] + (1 - alpha) * av_value[t + 1]
-        memory = 30.0
+        memory = 100.0
         beta = 0.9
         w_result = memory / (memory + len(value) - torch.arange(len(value)))
         w_av_value = (1.0 - w_result) * beta
@@ -115,46 +114,6 @@ class AlphaZero:
         return
 
     def check_EOG(self):
-
-        # NEW VERSION:
-        # def check_EOG(self, state):
-        #     with (torch.no_grad()):
-        #         encoded = self.game.encode(state)
-        #         # policy, state_value = self.core_model(encoded)
-        #         plus_mask, minus_mask, draw_mask = self.game.check_terminal_encoded(encoded)
-        #         terminal_state_value = plus_mask.to(dtype=torch.float32) - minus_mask.to(dtype=torch.float32)
-        #         is_terminal = plus_mask | minus_mask | draw_mask
-        #         # term = is_terminal.to(dtype=torch.float32)
-        #         # state_value = term * terminal_state_value
-        #     return terminal_state_value, is_terminal
-
-        # OLD VERSION:
-        # state_values, terminal = self.evaluator.check_EOG(states)
-
-        # def check_EOG(self, state):
-        #
-        #     state_CUDA = state.to(device=self.CUDA_device, dtype=torch.float32, non_blocking=True)
-        #     with torch.no_grad():
-        #         term_indicator_CUDA = self.terminal_check(state_CUDA)
-        #         # result_CUDA = self.model(states_CUDA)
-        #
-        #     term_indicator = term_indicator_CUDA.to(device='cpu', non_blocking=False)
-        #     # logit = result_CUDA[0].to(CUDA_device='cpu', non_blocking=False)
-        #     # value = result_CUDA[1].to(CUDA_device='cpu', non_blocking=False)
-        #     # Interpret result ...
-        #     dir_max = term_indicator[:, 0]
-        #     dir_min = term_indicator[:, 1]
-        #     sum_abs = term_indicator[:, 2]
-        #     plus_mask = (dir_max + 0.1 > self.game.win_length)
-        #     minus_mask = (dir_min - 0.1 < -self.game.win_length)
-        #     draw_mask = (sum_abs + 0.1 > self.game.position_size)
-        #     state_value = torch.zeros(state.shape[0], dtype=torch.float32)
-        #     state_value[draw_mask] = 0.0
-        #     state_value[plus_mask] = 1.0
-        #     state_value[minus_mask] = -1.0
-        #     terminal_mask = plus_mask | minus_mask | draw_mask
-        #
-        #     return state_value, terminal_mask
 
         states_CUDA = (self.player.view(-1, 1) * self.position).to(device=self.CUDA_device, dtype=torch.float32)
         state_values_CUDA, terminal_CUDA = self.model.check_EOG(states_CUDA)
@@ -224,11 +183,11 @@ class AlphaZero:
                   f"  Buffer size: {len(self.trainer_buffer)}",
                   f"  Data count: {self.trainer_buffer.data_count}")
 
-            if self.trainer_buffer.data_count > self.trainer_buffer_capacity // 4:
+            if self.trainer_buffer.data_count > self.trainer_buffer_capacity // 5:
                 print('Training begins ...')
-                self.trainer.improve_model()
-                for name, param in self.model.named_parameters():
-                    print(f"Parameter name: {name}")
-                    print(f"Parameter value: {param}")
+                self.trainer.improve_model(mini_batch=64, epochs=10)
+                # for name, param in self.model.named_parameters():
+                #     print(f"Parameter name: {name}")
+                #     print(f"Parameter value: {param}")
 
         return

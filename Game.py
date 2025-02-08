@@ -21,18 +21,18 @@ class Game:
         self.CUDA_device = config.get("CUDA_device", "cpu")
 
     # TODO: I will not use this method, it is too cumbersome ... Phase it out ...
-    def calc_state(self, player, position):
-        """
-        Calculate the game states. It is defined as state = player * position.
-        Needed for model evaluation, as models always assume it is the +1 player's turn to move.
-        Args:
-            player (torch.Tensor): Players to move (N,).
-            position (torch.Tensor): Game positions (N, state_size).
-        Returns:
-            state (torch.Tensor): Game states (N, state_size).
-        """
-        state = (player.view(-1, 1) * position).to(dtype=torch.float32)
-        return state
+    # def calc_state(self, player, position):
+    #     """
+    #     Calculate the game states. It is defined as state = player * position.
+    #     Needed for model evaluation, as models always assume it is the +1 player's turn to move.
+    #     Args:
+    #         player (torch.Tensor): Players to move (N,).
+    #         position (torch.Tensor): Game positions (N, state_size).
+    #     Returns:
+    #         state (torch.Tensor): Game states (N, state_size).
+    #     """
+    #     state = (player.view(-1, 1) * position).to(dtype=torch.float32)
+    #     return state
 
     def move(self, position, player, action):
         """

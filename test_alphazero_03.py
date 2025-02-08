@@ -1,7 +1,7 @@
 import torch
 from Amoeba import Amoeba
 from Model import Model
-from CoreModels import CoreModelSimple01
+from CoreModels import CoreModelSimple01, CoreModelBihary01
 from SearchEngine import SearchEngine
 # from ClassEvaluator import Evaluator
 from AlphaZero import AlphaZero
@@ -14,14 +14,14 @@ args = {
     'board_size': 15,
     'win_length': 5,
     'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
-    'num_MC': 600,
-    'num_child': 40,
-    'num_table': 100,
-    'num_agent': 1200,
-    'leaf_buffer_capacity': 4000,
+    'num_MC': 1000,
+    'num_child': 50,
+    'num_table': 120,
+    'num_agent': 1300,
+    'leaf_buffer_capacity': 6000,
     'eval_batch_size': 800,
-    'num_moves': 500,
-    'trainer_buffer_capacity': 100000,
+    'num_moves': 5000,
+    'trainer_buffer_capacity': 80000,
     'symmetry_used': True,
     # 'res_channels': 32,
     # 'hid_channels': 16,
@@ -32,18 +32,12 @@ args = {
 
 game = Amoeba(args)
 # core_model = CoreModelTrivial(args)
-core_model = CoreModelSimple01(args)
-model = Model(game, core_model)
-engine = SearchEngine(args, model)
+# core_model = CoreModelSimple01(args)
+core_model = CoreModelBihary01(args, 32, 16)
 
-# game = Amoeba(args)
-# # terminal_check = TerminalCheck01(args)
-# # model = TrivialModel01(args)
-# # model = TrivialModel02(args)
-# model = SimpleModel01(args)
-# # model = DeepMindModel01(args)
-# model.eval()
-# evaluator = Evaluator(args, game, terminal_check, model)
+model = Model(game, core_model)
+model.eval()
+engine = SearchEngine(args, model)
 
 start = time.time()
 alpha = AlphaZero(args, model)
