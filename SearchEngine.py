@@ -16,6 +16,7 @@ class SearchEngine:
         self.num_child = args.get('num_child')
         self.num_MC = args.get('num_MC')
         self.num_agent = args.get('num_agent')
+        self.split_depth = args.get('split_depth')
         self.num_node = (self.num_MC + self.num_agent + 1000) * (self.num_child + 10)
         self.position_size = self.game.position_size
         self.max_depth = self.game.position_size + 1
@@ -82,7 +83,7 @@ class SearchEngine:
     @profile
     def activate_agents(self):
         passive_agents = self.all_agents[~self.active]
-        num_new = min(self.num_table, passive_agents.shape[0])
+        num_new = min((self.num_table*4)//5, passive_agents.shape[0])
         new_tables = self.table_order[: num_new]
         new_agents = passive_agents[: num_new]
         self.active[new_agents] = True
@@ -159,14 +160,16 @@ class SearchEngine:
         # Lower ucb for best child to facilitate branching for consecutive paths ...
         self.tree.ucb[table, new_node] -= self.ucb_penalty
 
-        # TODO: Splitting for more than 1 table seems to work now ?!? ...
-        if self.num_table == 1:
-            # Then split agents, speeding up gameplay ...
-            self.split_agents(agent, table, child_node, depth_max=4)
-            self.split_agents(agent, table, child_node, depth_max=8)
-        # Low depth nodes are split into 3, medium depth nodes are split into 2.
-        else:
-            self.split_agents(agent, table, child_node, depth_max=2)
+        # DONE: Splitting for more than 1 table seems to work now
+        if self.split_depth > 0:
+            self.split_agents(agent, table, child_node, depth_max=self.split_depth)
+        # if self.num_table == 1:
+        #     # Then split agents, speeding up gameplay ...
+        #     self.split_agents(agent, table, child_node, depth_max=4)
+        #     self.split_agents(agent, table, child_node, depth_max=8)
+        # # Low depth nodes are split into 3, medium depth nodes are split into 2.
+        # else:
+        #     self.split_agents(agent, table, child_node, depth_max=2)
 
         # Update agent attributes ...
         self.node[agent] = new_node
@@ -258,11 +261,12 @@ class SearchEngine:
             mean_MC = self.tree.count[:, 1].to(torch.float).mean()
             min_MC = torch.min(self.tree.count[:, 1])
             max_MC = torch.max(self.tree.count[:, 1])
-            # print('minMC = ', min_MC.item(), ', maxMC = ', max_MC.item())
+
             # print(round(self.av_num_agent))
             if mean_MC > self.num_MC:
                 break
         # Formulate output ...
+        print('minMC = ', min_MC.item(), ', maxMC = ', max_MC.item())
         table = torch.arange(self.num_table)
         root = torch.ones(self.num_table, dtype=torch.long)
         position_value = self.tree.value[table, root]

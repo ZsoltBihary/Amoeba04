@@ -124,7 +124,7 @@ class AlphaZero:
             return
         terminated_tables = self.all_table[terminal]
         n_EOG = terminated_tables.shape[0]
-        print('Games terminated = ', n_EOG)
+        print('   --- Games terminated = ', n_EOG)
         terminated_players = self.player[terminal]
         terminated_state_values = state_values[terminal]
         # terminated_positions = self.position[terminal, :]

@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from TrainerBuffer import TrainerBuffer
+from line_profiler_pycharm import profile
 
 
 class Trainer:
@@ -40,6 +41,7 @@ class Trainer:
 
         return policy_loss + value_loss
 
+    @profile
     def improve_model(self, mini_batch, epochs):
         """
         Improve the model using data from the buffer by training for a few epochs.
@@ -48,6 +50,7 @@ class Trainer:
         self.fit(train_loader, num_epochs=epochs)
         self.buffer.reset_counter()
 
+    @profile
     def fit(self, train_loader, num_epochs):
         """
         Train the model for a specified number of epochs.
