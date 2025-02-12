@@ -83,7 +83,7 @@ class SearchEngine:
     @profile
     def activate_agents(self):
         passive_agents = self.all_agents[~self.active]
-        num_new = min((self.num_table*4)//5, passive_agents.shape[0])
+        num_new = min(((self.num_table+1)*4)//5, passive_agents.shape[0])
         new_tables = self.table_order[: num_new]
         new_agents = passive_agents[: num_new]
         self.active[new_agents] = True
@@ -162,7 +162,12 @@ class SearchEngine:
 
         # DONE: Splitting for more than 1 table seems to work now
         if self.split_depth > 0:
+
             self.split_agents(agent, table, child_node, depth_max=self.split_depth)
+            if self.num_table == 1:
+                self.split_agents(agent, table, child_node, depth_max=self.split_depth+2)
+
+
         # if self.num_table == 1:
         #     # Then split agents, speeding up gameplay ...
         #     self.split_agents(agent, table, child_node, depth_max=4)

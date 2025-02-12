@@ -1,7 +1,6 @@
 import torch
 from Amoeba import Amoeba
-# from ClassCoreModel import TerminalCheck01, TrivialModel01, TrivialModel02, SimpleModel01, DeepMindModel01
-from CoreModels import CoreModelTrivial, CoreModelSimple01
+from CoreModels import CoreModelTrivial, CoreModelSimple01, CoreModelBihary01
 from Model import Model
 from SearchEngine import SearchEngine
 # from torchinfo import summary
@@ -14,14 +13,14 @@ args = {
     'win_length': 5,
     'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
     # 'CUDA_device': 'cpu',
-    'num_MC': 10000,
-    'num_child': 30,
+    'num_MC': 2000,
+    'num_child': 50,
     'num_table': 1,
-    'num_agent': 100,
+    'num_agent': 10,
     'num_moves': 250,
     'leaf_buffer_capacity': 2000,
-    'eval_batch_size': 32,
-    'split_depth': 4,
+    'eval_batch_size': 8,
+    'split_depth': 0,
     # 'res_channels': 32,
     # 'hid_channels': 16,
     # 'num_res': 4,
@@ -31,8 +30,15 @@ args = {
 
 game = Amoeba(args)
 # core_model = CoreModelTrivial(args)
-core_model = CoreModelSimple01(args)
+# core_model = CoreModelSimple01(args)
+core_model = CoreModelBihary01(args, 32, 16)
 model = Model(game, core_model)
+# Load the state dictionary from the file
+# state_dict = torch.load('savedModels/Simple01_02_01.pth')
+state_dict = torch.load('savedModels/Bihary01_02_02.pth')
+# Load the state dictionary into the model
+model.load_state_dict(state_dict)
+model.cuda()
 engine = SearchEngine(args, model)
 
 player = -torch.ones(args.get('num_table'), dtype=torch.int32)
