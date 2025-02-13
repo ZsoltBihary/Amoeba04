@@ -15,12 +15,12 @@ args = {
     'win_length': 5,
     'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
     'num_MC': 2000,
-    'num_child': 200,
+    'num_child': 40,
     'num_table': 100,
     'num_agent': 500,
     'leaf_buffer_capacity': 6000,
     'eval_batch_size': 800,
-    'num_moves': 2000,
+    'num_moves': 1000,
     'trainer_buffer_capacity': 100000,
     'split_depth': 0,
     'symmetry_used': True
@@ -38,10 +38,10 @@ core_model = CoreModelBihary01(args, 64, 32)
 
 model = Model(game, core_model)
 # Load the state dictionary from the file
-# state_dict = torch.load('savedModels/Bihary01_02_01.pth')
-# # Load the state dictionary into the model
-# model.load_state_dict(state_dict)
-# model.cuda()
+state_dict = torch.load('savedModels/Bihary01_03_01.pth')
+# Load the state dictionary into the model
+model.load_state_dict(state_dict)
+model.cuda()
 
 model.eval()
 
@@ -51,7 +51,7 @@ alpha.self_play()
 
 # # OK, let us save the model ...
 # torch.save(model.state_dict(), 'savedModels/Simple01_02_01.pth')
-torch.save(model.state_dict(), 'savedModels/Bihary01_03_01.pth')
+torch.save(model.state_dict(), 'savedModels/Bihary01_03_02.pth')
 
 elapsed_time = (time.time() - start) / 60.0
 print(f"Elapsed time: {elapsed_time:.1f} minutes")

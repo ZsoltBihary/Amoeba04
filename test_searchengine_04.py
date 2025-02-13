@@ -14,7 +14,7 @@ args = {
     'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
     # 'CUDA_device': 'cpu',
     'num_MC': 2000,
-    'num_child': 50,
+    'num_child': 200,
     'num_table': 1,
     'num_agent': 10,
     'num_moves': 250,
@@ -31,11 +31,11 @@ args = {
 game = Amoeba(args)
 # core_model = CoreModelTrivial(args)
 # core_model = CoreModelSimple01(args)
-core_model = CoreModelBihary01(args, 32, 16)
+core_model = CoreModelBihary01(args, 64, 32)
 model = Model(game, core_model)
 # Load the state dictionary from the file
 # state_dict = torch.load('savedModels/Simple01_02_01.pth')
-state_dict = torch.load('savedModels/Bihary01_02_02.pth')
+state_dict = torch.load('savedModels/Bihary01_03_02.pth')
 # Load the state dictionary into the model
 model.load_state_dict(state_dict)
 model.cuda()
