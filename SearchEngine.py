@@ -16,7 +16,8 @@ class SearchEngine:
         self.num_child = args.get('num_child')
         self.num_MC = args.get('num_MC')
         self.num_agent = args.get('num_agent')
-        self.split_depth = args.get('split_depth')
+        self.agent_multi = args.get('agent_multi')
+        # self.split_depth = args.get('split_depth')
         self.num_node = (self.num_MC + self.num_agent + 1000) * (self.num_child + 10)
         self.position_size = self.game.position_size
         self.max_depth = self.game.position_size + 1
@@ -43,6 +44,7 @@ class SearchEngine:
         self.player = torch.zeros(self.num_agent, dtype=torch.int32)
         self.position = torch.zeros((self.num_agent, self.position_size), dtype=torch.int32)
         self.path = torch.zeros((self.num_agent, self.max_depth), dtype=torch.long)
+        self.multi = torch.zeros(self.num_agent, dtype=torch.int32)
         # Set up helper attributes
         self.table_order = torch.zeros(self.num_table, dtype=torch.long)
         self.ucb_penalty = 0.1
@@ -75,7 +77,8 @@ class SearchEngine:
                                        self.player[leaf_agent],
                                        self.position[leaf_agent, :],
                                        self.path[leaf_agent, :],
-                                       self.depth[leaf_agent])
+                                       self.depth[leaf_agent],
+                                       self.multi[leaf_agent])
             # free up agents that have found leaves
             self.active[leaf_agent] = False
         return
@@ -83,7 +86,9 @@ class SearchEngine:
     @profile
     def activate_agents(self):
         passive_agents = self.all_agents[~self.active]
-        num_new = min(((self.num_table+1)*4)//5, passive_agents.shape[0])
+        num_new = min(((self.num_table+1)*9)//10, passive_agents.shape[0])
+        if num_new == 0:
+            return
         new_tables = self.table_order[: num_new]
         new_agents = passive_agents[: num_new]
         self.active[new_agents] = True
@@ -94,6 +99,7 @@ class SearchEngine:
         self.position[new_agents, :] = self.root_position[new_tables, :]
         self.path[new_agents, 0] = 1
         self.depth[new_agents] = 1
+        self.multi[new_agents] = self.agent_multi
         return
 
     @profile
@@ -110,36 +116,36 @@ class SearchEngine:
         self.buffer_mgr.add_children(tables, parents, children, players)
         return
 
-    # TODO: Think again about splitting agents ... Commented out for now ...
-    def split_agents(self, agent, table, child_node, depth_max):
-
-        passive_agent = self.all_agents[~self.active]
-        old_idx = torch.arange(agent.shape[0])[self.depth[agent] <= depth_max]
-        old_agent = agent[old_idx]
-        old_table = table[old_idx]
-        old_child_node = child_node[old_idx, :]
-        if passive_agent.shape[0] >= old_agent.shape[0]:
-            new_agent = passive_agent[: old_agent.shape[0]]
-            self.active[new_agent] = True
-            self.table[new_agent] = old_table
-
-            ucb_tensor = self.tree.ucb[old_table.view(-1, 1), old_child_node]
-            best_idx = torch.argmax(ucb_tensor, dim=1)
-            new_node2 = old_child_node[torch.arange(best_idx.shape[0]), best_idx]
-            # Lower ucb for best child to facilitate branching for consecutive paths ...
-            self.tree.ucb[old_table, new_node2] -= self.ucb_penalty
-
-            self.node[new_agent] = new_node2
-            # TODO: Make this general, based on the Amoeba class ...
-            new_action = self.tree.action[old_table, new_node2]
-            self.position[new_agent, :] = self.position[old_agent, :]
-            self.position[new_agent, new_action] = self.player[old_agent]
-            self.player[new_agent] = -self.player[old_agent]
-            self.path[new_agent, :] = self.path[old_agent, :]
-            self.path[new_agent, self.depth[old_agent]] = new_node2
-            self.depth[new_agent] = self.depth[old_agent] + 1
-
-        return
+    # # TODO: Think again about splitting agents ... Commented out for now ...
+    # def split_agents(self, agent, table, child_node, depth_max):
+    #
+    #     passive_agent = self.all_agents[~self.active]
+    #     old_idx = torch.arange(agent.shape[0])[self.depth[agent] <= depth_max]
+    #     old_agent = agent[old_idx]
+    #     old_table = table[old_idx]
+    #     old_child_node = child_node[old_idx, :]
+    #     if passive_agent.shape[0] >= old_agent.shape[0]:
+    #         new_agent = passive_agent[: old_agent.shape[0]]
+    #         self.active[new_agent] = True
+    #         self.table[new_agent] = old_table
+    #
+    #         ucb_tensor = self.tree.ucb[old_table.view(-1, 1), old_child_node]
+    #         best_idx = torch.argmax(ucb_tensor, dim=1)
+    #         new_node2 = old_child_node[torch.arange(best_idx.shape[0]), best_idx]
+    #         # Lower ucb for best child to facilitate branching for consecutive paths ...
+    #         self.tree.ucb[old_table, new_node2] -= self.ucb_penalty
+    #
+    #         self.node[new_agent] = new_node2
+    #         # TODO: Make this general, based on the Amoeba class ...
+    #         new_action = self.tree.action[old_table, new_node2]
+    #         self.position[new_agent, :] = self.position[old_agent, :]
+    #         self.position[new_agent, new_action] = self.player[old_agent]
+    #         self.player[new_agent] = -self.player[old_agent]
+    #         self.path[new_agent, :] = self.path[old_agent, :]
+    #         self.path[new_agent, self.depth[old_agent]] = new_node2
+    #         self.depth[new_agent] = self.depth[old_agent] + 1
+    #
+    #     return
 
     @profile
     def update_agents(self):
@@ -153,28 +159,13 @@ class SearchEngine:
         child_node = self.tree.get_children(table, parent_node)
         # Save all the child information to the child buffer, we will use this info to update ucb ...
         self.save_children(table, parent_node, child_node, self.player[agent])
+
         # Find the best child node based on current ucb ...
         ucb_tensor = self.tree.ucb[table.view(-1, 1), child_node]
         best_idx = torch.argmax(ucb_tensor, dim=1)
         new_node = child_node[torch.arange(best_idx.shape[0]), best_idx]
         # Lower ucb for best child to facilitate branching for consecutive paths ...
         self.tree.ucb[table, new_node] -= self.ucb_penalty
-
-        # DONE: Splitting for more than 1 table seems to work now
-        if self.split_depth > 0:
-
-            self.split_agents(agent, table, child_node, depth_max=self.split_depth)
-            if self.num_table == 1:
-                self.split_agents(agent, table, child_node, depth_max=self.split_depth+2)
-
-
-        # if self.num_table == 1:
-        #     # Then split agents, speeding up gameplay ...
-        #     self.split_agents(agent, table, child_node, depth_max=4)
-        #     self.split_agents(agent, table, child_node, depth_max=8)
-        # # Low depth nodes are split into 3, medium depth nodes are split into 2.
-        # else:
-        #     self.split_agents(agent, table, child_node, depth_max=2)
 
         # Update agent attributes ...
         self.node[agent] = new_node
@@ -185,6 +176,78 @@ class SearchEngine:
         self.player[agent] *= -1
         self.path[agent, self.depth[agent]] = new_node
         self.depth[agent] += 1
+        # At this point, we do not modify the multiplicity of the agent ...
+
+        # Let us check if we have enough passive agents to accommodate an agent split ...
+        passive_agent = self.all_agents[~self.active]
+        old_idx = torch.arange(agent.shape[0])[self.multi[agent] > 1]
+        if (passive_agent.shape[0] >= old_idx.shape[0]) and (old_idx.shape[0] > 0):
+            # Then we do have enough passive agents, let us do the splitting ...
+            old_agent = agent[old_idx]
+            old_table = table[old_idx]
+            old_child_node = child_node[old_idx, :]
+            # Reconsider the best children for these selected old agents that we want to split ...
+            ucb_tensor2 = self.tree.ucb[old_table.view(-1, 1), old_child_node]
+            best_idx2 = torch.argmax(ucb_tensor2, dim=1)
+            new_node2 = old_child_node[torch.arange(best_idx.shape[0]), best_idx2]
+            # Lower ucb for best child to facilitate branching for consecutive paths ...
+            self.tree.ucb[old_table, new_node2] -= self.ucb_penalty
+            # Define new agent attributes ...
+            new_agent = passive_agent[: old_agent.shape[0]]
+            self.active[new_agent] = True
+            self.table[new_agent] = old_table
+
+            self.node[new_agent] = new_node2
+            # TODO: Make this general, based on the Amoeba class ...
+            new_action = self.tree.action[old_table, new_node2]
+            self.position[new_agent, :] = self.position[old_agent, :]
+            self.position[new_agent, new_action] = self.player[old_agent]
+            self.player[new_agent] = -self.player[old_agent]
+            self.path[new_agent, :] = self.path[old_agent, :]
+            self.path[new_agent, self.depth[old_agent]] = new_node2
+            self.depth[new_agent] = self.depth[old_agent] + 1
+            # Now let us figure out the multiplicities ...
+            old_multi = self.multi[old_agent]
+            new_multi = (old_multi + 2) // 3
+            old_multi = old_multi - new_multi
+            self.multi[old_agent] = old_multi
+            self.multi[new_agent] = new_multi
+
+        # # OLD agent_split starts here *************************************************
+        # passive_agent = self.all_agents[~self.active]
+        # old_idx = torch.arange(agent.shape[0])[self.depth[agent] <= depth_max]
+        # old_agent = agent[old_idx]
+        # old_table = table[old_idx]
+        # old_child_node = child_node[old_idx, :]
+        # if passive_agent.shape[0] >= old_agent.shape[0]:
+        #     new_agent = passive_agent[: old_agent.shape[0]]
+        #     self.active[new_agent] = True
+        #     self.table[new_agent] = old_table
+        #
+        #     ucb_tensor = self.tree.ucb[old_table.view(-1, 1), old_child_node]
+        #     best_idx = torch.argmax(ucb_tensor, dim=1)
+        #     new_node2 = old_child_node[torch.arange(best_idx.shape[0]), best_idx]
+        #     # Lower ucb for best child to facilitate branching for consecutive paths ...
+        #     self.tree.ucb[old_table, new_node2] -= self.ucb_penalty
+        #
+        #     self.node[new_agent] = new_node2
+        #     # TODO: Make this general, based on the Amoeba class ...
+        #     new_action = self.tree.action[old_table, new_node2]
+        #     self.position[new_agent, :] = self.position[old_agent, :]
+        #     self.position[new_agent, new_action] = self.player[old_agent]
+        #     self.player[new_agent] = -self.player[old_agent]
+        #     self.path[new_agent, :] = self.path[old_agent, :]
+        #     self.path[new_agent, self.depth[old_agent]] = new_node2
+        #     self.depth[new_agent] = self.depth[old_agent] + 1
+        # # OLD agent_split ends here *************************************************
+
+        # # TODO: Reworking agent splitting...
+        # if self.split_depth > 0:
+        #
+        #     self.split_agents(agent, table, child_node, depth_max=self.split_depth)
+        #     if self.num_table == 1:
+        #         self.split_agents(agent, table, child_node, depth_max=self.split_depth+2)
+
         return
 
     @profile

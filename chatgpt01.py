@@ -1,31 +1,40 @@
 import torch
-import torch.nn as nn
 
+def helper_unique_with_multiplicity(x, multi):
+    # Step 1: Get unique rows and their mapping
+    uniq, inverse = torch.unique(x, dim=0, return_inverse=True)
 
-class DirBatchNorm2D(nn.Module):
-    def __init__(self, num_per_dir):
-        super().__init__()
-        self.num_per_dir = num_per_dir
+    # Step 2: Get any representative index of each unique row
+    perm = torch.arange(inverse.size(0), device=inverse.device)
+    indices = torch.empty(uniq.size(0), dtype=torch.long, device=x.device)
+    indices.scatter_(0, inverse, perm)
 
-        # Define 4 separate batch normalization layers explicitly
-        self.bn1 = nn.BatchNorm2d(num_per_dir)
-        self.bn2 = nn.BatchNorm2d(num_per_dir)
-        self.bn3 = nn.BatchNorm2d(num_per_dir)
-        self.bn4 = nn.BatchNorm2d(num_per_dir)
+    # Step 3: Accumulate multiplicities
+    count = torch.zeros(uniq.size(0), dtype=multi.dtype, device=multi.device)
+    count.index_put_((inverse,), multi, accumulate=True)
 
-    def forward(self, x):
-        N, C, H, W = x.shape
-        assert C == 4 * self.num_per_dir, "Channel count must be 4 * num_per_dir"
+    return indices, count
 
-        # Split input tensor into 4 groups along the channel dimension
-        x1, x2, x3, x4 = torch.chunk(x, chunks=4, dim=1)
+if __name__ == "__main__":
 
-        # Apply batch normalization separately
-        x1 = self.bn1(x1)
-        x2 = self.bn2(x2)
-        x3 = self.bn3(x3)
-        x4 = self.bn4(x4)
+    # Sample input: (N, 2) tensor with repeating rows
+    x = torch.tensor([
+        [1, 2],
+        [1, 4],
+        [1, 2],  # Duplicate of row 0
+        [5, 2],
+        [1, 4],  # Duplicate of row 1
+        [1, 2]   # Duplicate of row 0
+    ])
 
-        # Concatenate the outputs back along the channel dimension
-        x = torch.cat([x1, x2, x3, x4], dim=1)
-        return x
+    # Multiplicity tensor (same shape as x, but 1D)
+    multi = torch.tensor([2, 1, 3, 4, 5, 6])  # Assigned arbitrarily
+
+    # Run the function
+    indices, count = helper_unique_with_multiplicity(x, multi)
+
+    # Print results
+    print("Input x:\n", x)
+    print("Multiplicity:\n", multi)
+    print("Indices of unique rows:\n", indices)
+    print("Accumulated counts:\n", count)

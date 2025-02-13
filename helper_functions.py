@@ -2,6 +2,45 @@ import torch
 from line_profiler_pycharm import profile
 
 
+def helper_unique_with_multiplicity(x, multi):
+    # Step 1: Get unique rows and their mapping
+    uniq, inverse = torch.unique(x, dim=0, return_inverse=True)
+    # Step 2: Get any representative index of each unique row
+    perm = torch.arange(inverse.size(0), device=inverse.device)
+    indices = torch.empty(uniq.size(0), dtype=torch.long, device=x.device)
+    indices.scatter_(0, inverse, perm)
+    # Step 3: Accumulate multiplicities
+    count = torch.zeros(uniq.size(0), dtype=multi.dtype, device=multi.device)
+    count.index_put_((inverse,), multi, accumulate=True)
+
+    return indices, count
+
+
+if __name__ == "__main__":
+
+    # Sample input: (N, 2) tensor with repeating rows
+    x = torch.tensor([
+        [1, 2],
+        [1, 4],
+        [1, 2],  # Duplicate of row 0
+        [5, 2],
+        [1, 4],  # Duplicate of row 1
+        [1, 2]   # Duplicate of row 0
+    ])
+
+    # Multiplicity tensor (same shape as x, but 1D)
+    multi = torch.tensor([2, 1, 3, 4, 5, 6])  # Assigned arbitrarily
+
+    # Run the function
+    indices, count = helper_unique_with_multiplicity(x, multi)
+
+    # Print results
+    print("Input x:\n", x)
+    print("Multiplicity:\n", multi)
+    print("Indices of unique rows:\n", indices)
+    print("Accumulated counts:\n", count)
+
+
 def soft_characteristic(x, centers, accuracy=0.01):
     """
     Computes a soft characteristic encoding of the input tensor relative to the given centers.
@@ -44,22 +83,15 @@ def helper_unique(x, dim=None):
                 [1, 2, 5]]),
         tensor([0, 1, 3]))
     """
-    # uniq, inverse = torch.unique(
-    #     x, sorted=True, return_inverse=True, dim=dim)
-    # perm = torch.arange(inverse.size(0), dtype=inverse.dtype,
-    #                     CUDA_device=inverse.CUDA_device)
-    # # inverse, perm = inverse.flip([0]), perm.flip([0])
-    # return uniq, inverse.new_empty(uniq.size(0)).scatter_(0, inverse, perm)
-
-    # Find unique values and their counts
-    # unique_tables, inverse_indices, counts = torch.unique(tables, return_inverse=True, return_counts=True)
 
     uniq, inverse, count = torch.unique(
         x, sorted=True, return_inverse=True, dim=dim, return_counts=True)
     perm = torch.arange(inverse.size(0), dtype=inverse.dtype,
                         device=inverse.device)
-    # inverse, perm = inverse.flip([0]), perm.flip([0])
+
     return uniq, count, inverse.new_empty(uniq.size(0)).scatter_(0, inverse, perm)
+
+# inverse, perm = inverse.flip([0]), perm.flip([0])
 
 
 if __name__ == "__main__":

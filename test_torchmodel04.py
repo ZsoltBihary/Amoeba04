@@ -27,8 +27,8 @@ args = {
 
 game = Amoeba(args)
 # core_model = CoreModelTrivial(args)
-core_model = CoreModelSimple01(args)
-# core_model = CoreModelBihary01(args, 16, 8)
+# core_model = CoreModelSimple01(args)
+core_model = CoreModelBihary01(args, 64, 32)
 model = Model(game, core_model)
 
 player = torch.ones(args.get('num_table'), dtype=torch.int32)

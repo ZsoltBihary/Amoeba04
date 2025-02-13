@@ -1,10 +1,11 @@
 import torch
-from helper_functions import helper_unique
+# from helper_functions import helper_unique, helper_unique_with_multiplicity
+from helper_functions import helper_unique_with_multiplicity
 from line_profiler_pycharm import profile
 
 
 class LeafBuffer:
-    # TODO: Rename buffer_size to capacity
+    # DONE: Rename buffer_size to capacity
     def __init__(self, capacity, action_size, max_depth):
         self.capacity = capacity
         self.next_idx = 0
@@ -24,7 +25,7 @@ class LeafBuffer:
     def empty(self):
         self.next_idx = 0
 
-    def add_leaves(self, tables, nodes, players, positions, paths, depths):
+    def add_leaves(self, tables, nodes, players, positions, paths, depths, multis):
         end_idx = self.next_idx + tables.shape[0]
         self.table[self.next_idx: end_idx] = tables
         self.node[self.next_idx: end_idx] = nodes
@@ -32,6 +33,7 @@ class LeafBuffer:
         self.position[self.next_idx: end_idx, :] = positions
         self.path[self.next_idx: end_idx, :] = paths
         self.depth[self.next_idx: end_idx] = depths
+        self.multi[self.next_idx: end_idx] = multis
 
         self.next_idx = end_idx
         return
@@ -48,9 +50,15 @@ class LeafBuffer:
         positions = self.position[: self.next_idx, :]
         paths = self.path[: self.next_idx, :]
         depths = self.depth[: self.next_idx]
+        multis = self.multi[: self.next_idx]
         # Combine tables and nodes into a single tensor of shape (N, 2)
         combined = torch.stack([tables, nodes], dim=1)
-        uni_combined, uni_count, uni_index = helper_unique(combined, dim=0)
+
+        uni_index, uni_count = helper_unique_with_multiplicity(combined, multis)
+
+        # uni_combined, uni_count, uni_index = helper_unique(combined, dim=0)
+        # Calculate the new multiplicity of the combined leaves
+        # combined_multis =
         # Use these indices to select unique values
         self.empty()
         self.add_leaves(tables[uni_index],
@@ -58,8 +66,9 @@ class LeafBuffer:
                         players[uni_index],
                         positions[uni_index, :],
                         paths[uni_index, :],
-                        depths[uni_index])
-        self.multi[: self.next_idx] = uni_count
+                        depths[uni_index],
+                        uni_count)
+        # self.multi[: self.next_idx] = uni_count
         return
 
     def add_eval_results(self, logits, state_values, are_terminal):
@@ -164,8 +173,8 @@ class SearchBufferManager:
         self.child_buffer.empty()
         self.batch_full = False
 
-    def add_leaves(self, tables, nodes, players, positions, paths, depths):
-        self.leaf_buffer.add_leaves(tables, nodes, players, positions, paths, depths)
+    def add_leaves(self, tables, nodes, players, positions, paths, depths, multis):
+        self.leaf_buffer.add_leaves(tables, nodes, players, positions, paths, depths, multis)
         if self.leaf_buffer.next_idx > self.min_batch_size:
             self.batch_full = True
 

@@ -63,6 +63,7 @@ class AlphaZero:
         self.next_move_idx = torch.zeros(self.num_table, dtype=torch.long)
         # Precalculate how many best moves are considered ...
         self.k_move_select = torch.ones(self.max_move_idx, dtype=torch.int32)
+        self.k_move_select[: 10] = 10
         self.k_move_select[: 10] = 5
         self.all_table = torch.arange(self.num_table)
         self.player = torch.zeros(self.num_table, dtype=torch.int32)

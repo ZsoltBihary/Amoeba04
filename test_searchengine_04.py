@@ -20,7 +20,8 @@ args = {
     'num_moves': 250,
     'leaf_buffer_capacity': 2000,
     'eval_batch_size': 8,
-    'split_depth': 0,
+    'agent_multi': 8
+    # 'split_depth': 0,
     # 'res_channels': 32,
     # 'hid_channels': 16,
     # 'num_res': 4,
