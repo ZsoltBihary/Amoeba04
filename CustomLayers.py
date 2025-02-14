@@ -2,6 +2,138 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from custom_convolutions import dir2dir_conv2d, dir2point_conv2d, point2dir_conv2d
+from custom_convolutions import directional_pointwise_conv2d, directional_depthwise_conv2d
+
+
+class DirectionalPointwiseConv2D(nn.Module):
+    def __init__(self, cen_in, cen_out, dir_in, dir_out):
+        """
+        Custom Pointwise Convolutional Layer for directional feature mixing.
+
+        Args:
+            cen_in (int): Number of input central feature channels.
+            cen_out (int): Number of output central feature channels.
+            dir_in (int): Number of input directional feature channels per direction.
+            dir_out (int): Number of output directional feature channels per direction.
+        """
+        super().__init__()
+
+        # self.cen_in = cen_in
+        # self.c_out = cen_out
+        # self.d_in = dir_in
+        # self.d_out = dir_out
+
+        # Define trainable parameters for each mixing tensor
+        self.cen2cen = nn.Parameter(torch.empty(cen_out, cen_in))
+        self.par2cen = nn.Parameter(torch.empty(cen_out, dir_in))
+        self.dia2cen = nn.Parameter(torch.empty(cen_out, dir_in))
+        self.cen2dir = nn.Parameter(torch.empty(dir_out, cen_in))
+        self.dir2dir = nn.Parameter(torch.empty(dir_out, dir_in))
+
+        # Initialize the parameters
+        self._initialize_parameters()
+
+    def _initialize_parameters(self):
+        """Initialize parameters using Kaiming initialization for stability."""
+        nn.init.kaiming_normal_(self.cen2cen, mode='fan_out', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.par2cen, mode='fan_out', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.dia2cen, mode='fan_out', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.cen2dir, mode='fan_out', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.dir2dir, mode='fan_out', nonlinearity='relu')
+
+    def forward(self, x):
+        """Applies the custom directional pointwise convolution."""
+        return directional_pointwise_conv2d(x, self.cen2cen, self.par2cen, self.dia2cen, self.cen2dir, self.dir2dir)
+
+
+class DirectionalDepthwiseConv2D(nn.Module):
+    def __init__(self, cen_in, dir_in, cen_k, dir_k):
+        """
+        Custom Depthwise Convolutional Layer with separate handling of central and directional features.
+
+        Args:
+            cen_in (int): Number of central feature channels.
+            dir_in (int): Number of directional feature channels per direction.
+            cen_k (int): Kernel size for central features.
+            dir_k (int): Kernel size for directional features.
+        """
+        super().__init__()
+
+        assert dir_k >= cen_k, "Directional kernel size must not be smaller than central kernel size"
+
+        # self.cen_size = cen_size
+        # self.dir_size = dir_size
+        # self.cen_k = cen_k
+        # self.dir_k = dir_k
+
+        # Define learnable convolution kernels
+        self.cen_tensor = nn.Parameter(torch.empty(cen_in, cen_k, cen_k))
+        self.dir_tensor = nn.Parameter(torch.empty(dir_in, dir_k))
+
+        # Initialize the parameters
+        self._initialize_parameters()
+
+    def _initialize_parameters(self):
+        """Initialize parameters using Kaiming initialization for stability."""
+        nn.init.kaiming_normal_(self.cen_tensor, mode='fan_out', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.dir_tensor, mode='fan_out', nonlinearity='relu')
+
+    def forward(self, x):
+        """Applies the custom directional depthwise convolution."""
+        return directional_depthwise_conv2d(x, self.cen_tensor, self.dir_tensor)
+
+
+class DirectionalSeparableConv2D(nn.Module):
+    def __init__(self, cen_in, cen_out, dir_in, dir_out, cen_k, dir_k):
+        """
+        Custom Depthwise-Separable Convolutional Layer using directional depthwise and pointwise convolutions.
+
+        Args:
+            cen_in (int): Number of input central feature channels.
+            cen_out (int): Number of output central feature channels.
+            dir_in (int): Number of input directional feature channels per direction.
+            dir_out (int): Number of output directional feature channels per direction.
+            cen_k (int): Kernel size for central features.
+            dir_k (int): Kernel size for directional features.
+        """
+        super().__init__()
+
+        # Depthwise Convolution
+        self.depthwise = DirectionalDepthwiseConv2D(cen_in, dir_in, cen_k, dir_k)
+
+        # Pointwise Convolution
+        self.pointwise = DirectionalPointwiseConv2D(cen_in, cen_out, dir_in, dir_out)
+
+    def forward(self, x):
+        """Applies depthwise convolution first, then pointwise convolution."""
+        x = self.depthwise(x)
+        x = self.pointwise(x)
+        return x
+
+
+if __name__ == "__main__":
+    N, H, W = 128, 8, 8
+    c_in, c_out, d_in, d_out = 4, 6, 5, 7
+    c_k, d_k = 3, 5
+    input_tensor = torch.randn(N, c_in + 4 * d_in, H, W)
+
+    print("=== Testing DirectionalDepthwiseConv2D ===")
+    d_layer = DirectionalDepthwiseConv2D(c_in, d_in, c_k, d_k)
+    d_output = d_layer(input_tensor)
+    print("Input Shape:", input_tensor.shape)
+    print("Output Shape:", d_output.shape)
+
+    print("=== Testing DirectionalPointwiseConv2D ===")
+    p_layer = DirectionalPointwiseConv2D(c_in, c_out, d_in, d_out)
+    p_output = p_layer(d_output)
+    print("Input Shape:", d_output.shape)
+    print("Output Shape:", p_output.shape)
+
+    print("=== Testing DirectionalSeparableConv2D ===")
+    s_layer = DirectionalSeparableConv2D(c_in, c_out, d_in, d_out, c_k, d_k)
+    s_output = s_layer(input_tensor)
+    print("Input Shape:", input_tensor.shape)
+    print("Output Shape:", s_output.shape)
 
 
 class DirBatchNorm2D(nn.Module):
@@ -285,32 +417,32 @@ class DepthWiseConv2D(nn.Module):
         return F.conv2d(x, self.kernel, bias=None, stride=1, padding=self.kernel_size // 2, groups=self.groups)
 
 
-if __name__ == "__main__":
-    # Example input tensors
-    dir_inputs = torch.randn(1, 12, 8, 8)  # Batch of 128, 4*3 channels, 8x8 board
-    point_inputs = torch.randn(1, 3, 8, 8)  # Batch of 128, 3 channels, 8x8 board
-
-    # Dir2DirConv2D example
-    dir2dir_layer = Dir2DirConv2D(in_channels_per_dir=3, out_channels_per_dir=6, kernel_size=3)
-    output_dir2dir = dir2dir_layer(dir_inputs)
-    print("Dir2Dir Output Shape:", output_dir2dir.shape)
-
-    # Dir2PointConv2D example
-    dir2point_layer = Dir2PointConv2D(in_channels_per_dir=3, out_channels=8, kernel_size=3)
-    output_dir2point = dir2point_layer(dir_inputs)
-    print("Dir2Point Output Shape:", output_dir2point.shape)
-
-    # Point2DirConv2D example
-    point2dir_layer = Point2DirConv2D(in_channels=3, out_channels_per_dir=1, kernel_size=3)
-    output_point2dir = point2dir_layer(point_inputs)
-    print("Point2Dir Output Shape:", output_point2dir.shape)
-
-    # Point2DirSum example
-    point_inputs = torch.zeros(1, 2, 7, 7)  # Batch of 1,  channel 2, 7x7 board
-    point_inputs[0, 0, 1:3, 3:5] = 1.0
-    point_inputs[0, 1, 1:4, 3:6] = 1.0
-    print("point_inputs:\n", point_inputs)
-    dir_sum_layer = Point2DirSum(in_channels=2, win_length=5)
-    dir_sum = dir_sum_layer(point_inputs)
-    print("Point2DirSum Output Shape:", dir_sum.shape)
-    print("dir_sum:\n", dir_sum)
+# if __name__ == "__main__":
+#     # Example input tensors
+#     dir_inputs = torch.randn(1, 12, 8, 8)  # Batch of 128, 4*3 channels, 8x8 board
+#     point_inputs = torch.randn(1, 3, 8, 8)  # Batch of 128, 3 channels, 8x8 board
+#
+#     # Dir2DirConv2D example
+#     dir2dir_layer = Dir2DirConv2D(in_channels_per_dir=3, out_channels_per_dir=6, kernel_size=3)
+#     output_dir2dir = dir2dir_layer(dir_inputs)
+#     print("Dir2Dir Output Shape:", output_dir2dir.shape)
+#
+#     # Dir2PointConv2D example
+#     dir2point_layer = Dir2PointConv2D(in_channels_per_dir=3, out_channels=8, kernel_size=3)
+#     output_dir2point = dir2point_layer(dir_inputs)
+#     print("Dir2Point Output Shape:", output_dir2point.shape)
+#
+#     # Point2DirConv2D example
+#     point2dir_layer = Point2DirConv2D(in_channels=3, out_channels_per_dir=1, kernel_size=3)
+#     output_point2dir = point2dir_layer(point_inputs)
+#     print("Point2Dir Output Shape:", output_point2dir.shape)
+#
+#     # Point2DirSum example
+#     point_inputs = torch.zeros(1, 2, 7, 7)  # Batch of 1,  channel 2, 7x7 board
+#     point_inputs[0, 0, 1:3, 3:5] = 1.0
+#     point_inputs[0, 1, 1:4, 3:6] = 1.0
+#     print("point_inputs:\n", point_inputs)
+#     dir_sum_layer = Point2DirSum(in_channels=2, win_length=5)
+#     dir_sum = dir_sum_layer(point_inputs)
+#     print("Point2DirSum Output Shape:", dir_sum.shape)
+#     print("dir_sum:\n", dir_sum)
