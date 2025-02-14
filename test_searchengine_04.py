@@ -9,18 +9,19 @@ from SearchEngine import SearchEngine
 
 # Collect parameters in a dictionary
 args = {
-    'board_size': 15,
+    'board_size': 11,
     'win_length': 5,
     'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
-    # 'CUDA_device': 'cpu',
     'num_MC': 2000,
-    'num_child': 200,
+    'num_child': 50,
     'num_table': 1,
-    'num_agent': 10,
-    'num_moves': 250,
-    'leaf_buffer_capacity': 2000,
-    'eval_batch_size': 8,
-    'agent_multi': 8
+    'num_agent': 15,
+    'leaf_buffer_capacity': 6000,
+    'eval_batch_size': 10,
+    'num_moves': 2000,
+    'trainer_buffer_capacity': 100000,
+    'agent_multi': 5,
+    'symmetry_used': True
     # 'split_depth': 0,
     # 'res_channels': 32,
     # 'hid_channels': 16,
@@ -36,7 +37,7 @@ core_model = CoreModelBihary01(args, 64, 32)
 model = Model(game, core_model)
 # Load the state dictionary from the file
 # state_dict = torch.load('savedModels/Simple01_02_01.pth')
-state_dict = torch.load('savedModels/Bihary01_03_02.pth')
+state_dict = torch.load('savedModels/Bihary01_03_03.pth')
 # Load the state dictionary into the model
 model.load_state_dict(state_dict)
 model.cuda()
