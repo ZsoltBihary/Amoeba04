@@ -1,40 +1,18 @@
 import torch
 
-def helper_unique_with_multiplicity(x, multi):
-    # Step 1: Get unique rows and their mapping
-    uniq, inverse = torch.unique(x, dim=0, return_inverse=True)
+# Create the original tensor (2, 4, 3, 1, 1)
+x1 = torch.arange(2 * 4 * 3 * 2 * 2).reshape(2, 4, 3, 2, 2)
 
-    # Step 2: Get any representative index of each unique row
-    perm = torch.arange(inverse.size(0), device=inverse.device)
-    indices = torch.empty(uniq.size(0), dtype=torch.long, device=x.device)
-    indices.scatter_(0, inverse, perm)
+print("Original Tensor (x1):")
+print(x1.squeeze(-1).squeeze(-1))  # Remove last 2 dims for better visualization
 
-    # Step 3: Accumulate multiplicities
-    count = torch.zeros(uniq.size(0), dtype=multi.dtype, device=multi.device)
-    count.index_put_((inverse,), multi, accumulate=True)
+# Correct reshaping, NO PERMUTE NEEDED!
+x2 = x1.reshape(2, 12, 2, 2)
 
-    return indices, count
+print("\nReshaped Tensor (x2):")
+print(x2.squeeze(-1).squeeze(-1))  # Again, remove last 2 dims for readability
 
-if __name__ == "__main__":
-
-    # Sample input: (N, 2) tensor with repeating rows
-    x = torch.tensor([
-        [1, 2],
-        [1, 4],
-        [1, 2],  # Duplicate of row 0
-        [5, 2],
-        [1, 4],  # Duplicate of row 1
-        [1, 2]   # Duplicate of row 0
-    ])
-
-    # Multiplicity tensor (same shape as x, but 1D)
-    multi = torch.tensor([2, 1, 3, 4, 5, 6])  # Assigned arbitrarily
-
-    # Run the function
-    indices, count = helper_unique_with_multiplicity(x, multi)
-
-    # Print results
-    print("Input x:\n", x)
-    print("Multiplicity:\n", multi)
-    print("Indices of unique rows:\n", indices)
-    print("Accumulated counts:\n", count)
+# Verify stacking
+print("\nVerifying Stacking for the first batch:")
+for i in range(4):
+    print(f"Block {i+1}: {x2[0, i*3:(i+1)*3, 0, 0].tolist()}")

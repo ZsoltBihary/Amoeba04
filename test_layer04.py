@@ -2,7 +2,7 @@ import torch
 from Amoeba import Amoeba
 from Model import Model
 from CoreModels import CoreModelSimple01
-from CoreModels import CoreModelBihary01, CoreModelBihary02
+from CoreModels import CoreModelBihary01
 from torchinfo import summary
 from line_profiler_pycharm import profile
 import time
@@ -17,7 +17,7 @@ args = {
     'num_table': 2,
     'num_MC': 100,
     'num_moves': 5,
-    'eval_batch_size': 800,
+    'eval_batch_size': 16,
     # 'res_channels': 32,
     # 'hid_channels': 16,
     # 'num_res': 4,
@@ -28,11 +28,11 @@ args = {
 game = Amoeba(args)
 # core_model = CoreModelTrivial(args)
 # core_model = CoreModelSimple01(args)
-core_model = CoreModelBihary02(args, 24, 24, 8, 8, num_blocks=9)
+core_model = CoreModelBihary01(args, 64, 32)
 model = Model(game, core_model)
 
-player = torch.ones(args.get('eval_batch_size'), dtype=torch.int32)
-position = game.get_random_positions(n=args.get('eval_batch_size'), n_plus=1, n_minus=0)
+player = torch.ones(args.get('num_table'), dtype=torch.int32)
+position = game.get_random_positions(n=args.get('num_table'), n_plus=1, n_minus=0)
 state_CUDA = (player.view(-1, 1) * position).to(dtype=torch.float32, device=args.get('CUDA_device'))
 
 # game.print_board(position[0, :])

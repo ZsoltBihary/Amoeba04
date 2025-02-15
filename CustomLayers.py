@@ -3,6 +3,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 from custom_convolutions import dir2dir_conv2d, dir2point_conv2d, point2dir_conv2d
 from custom_convolutions import directional_pointwise_conv2d, directional_depthwise_conv2d
+from line_profiler_pycharm import profile
+
+
+class BatchNormReLU2D(nn.Module):
+    def __init__(self, num_features):
+        super().__init__()
+        # Batch normalization
+        self.bn = nn.BatchNorm2d(num_features=num_features)
+        # Activation
+        self.act = nn.ReLU()
+
+    def forward(self, x):
+        return self.act(self.bn(x))
 
 
 class DirectionalPointwiseConv2D(nn.Module):
@@ -104,6 +117,7 @@ class DirectionalSeparableConv2D(nn.Module):
         # Pointwise Convolution
         self.pointwise = DirectionalPointwiseConv2D(cen_in, cen_out, dir_in, dir_out)
 
+    @profile
     def forward(self, x):
         """Applies depthwise convolution first, then pointwise convolution."""
         x = self.depthwise(x)
@@ -112,8 +126,8 @@ class DirectionalSeparableConv2D(nn.Module):
 
 
 if __name__ == "__main__":
-    N, H, W = 128, 8, 8
-    c_in, c_out, d_in, d_out = 4, 6, 5, 7
+    N, H, W = 800, 15, 15
+    c_in, c_out, d_in, d_out = 32, 16, 32, 16
     c_k, d_k = 3, 5
     input_tensor = torch.randn(N, c_in + 4 * d_in, H, W)
 
