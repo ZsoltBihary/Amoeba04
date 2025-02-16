@@ -1,9 +1,12 @@
 import torch
 import torch.nn as nn
 # import torch.nn.functional as F
-from CustomLayers import (Dir2DirSum, Dir2PointConv2D, Point2DirConv2D, Dir2DirConv2D,
+# from CustomLayers import (Dir2DirSum, Dir2PointConv2D, Point2DirConv2D, Dir2DirConv2D,
+#                           DepthwiseSeparableConv2D, DirBatchNorm2D)
+from CustomLayers import (Dir2DirSum, Dir2PointConv2D, Dir2DirConv2D,
                           DepthwiseSeparableConv2D, DirBatchNorm2D)
-from CustomLayers import DirectionalPointwiseConv2D, DirectionalDepthwiseConv2D, DirectionalSeparableConv2D
+# from CustomLayers import DirectionalPointwiseConv2D, DirectionalDepthwiseConv2D, DirectionalSeparableConv2D
+from CustomLayers import DirectionalPointwiseConv2D, DirectionalSeparableConv2D, DirectionalProjection2D
 from CustomLayers import BatchNormReLU2D
 
 from line_profiler_pycharm import profile
@@ -14,6 +17,7 @@ class InputBihary02(nn.Module):
         super().__init__()
         self.format_input = DirectionalPointwiseConv2D(cen_in=3, cen_out=cen_out, dir_in=9, dir_out=dir_out)
 
+    @profile
     def forward(self, encoded):
         point_encoded, dir_encoded = encoded
         # point_encoded: Tensor(N, 3, board_size, board_size)
@@ -50,6 +54,7 @@ class ResBlockBihary02(nn.Module):
                                                 dir_in=dir_resi, dir_out=dir_main,
                                                 cen_k=cen_k, dir_k=dir_k)
 
+    @profile
     def forward(self, x):
         skip = x
         out = self.br1(x)
@@ -60,6 +65,51 @@ class ResBlockBihary02(nn.Module):
         return out
 
 
+class OutputBihary02(nn.Module):
+    def __init__(self, cen_in, dir_in, chan_logit=8, chan_value=1, chan_value_hid=8, action_size=225, out_k=15):
+        super().__init__()
+        self.chan_logit = chan_logit
+        self.chan_value = chan_value
+        chan_in = cen_in + 4 * dir_in
+        chan_combined = chan_logit + chan_value
+        # Batch normalization + ReLU
+        self.br1 = BatchNormReLU2D(num_features=chan_in)
+        # Pointwise projection to logit-value space
+        self.proj = DirectionalProjection2D(cen_in=cen_in, cen_out=chan_combined, dir_in=dir_in)
+        # Batch normalization + ReLU
+        self.br2 = BatchNormReLU2D(num_features=chan_combined)
+        # Wide spatial convolution for logit
+        self.conv_logit = nn.Conv2d(chan_logit, 1, kernel_size=out_k,
+                                    padding=out_k//2, groups=1, bias=False)
+        # Wide spatial convolution for value
+        self.conv_value = nn.Conv2d(chan_value, chan_value_hid, kernel_size=out_k,
+                                    padding=out_k // 2, groups=1, bias=True)
+        self.act_value = nn.ReLU()
+        self.lin_value = nn.Linear(in_features=action_size*chan_value_hid, out_features=1, bias=True)
+
+    @profile
+    def forward(self, x):
+
+        x = self.br1(x)
+        out = self.proj(x)
+        out = self.br2(out)
+
+        out_logit = out[:, : self.chan_logit, ...]
+        out_logit = self.conv_logit(out_logit)
+        logit = out_logit.flatten(start_dim=1)
+
+        out_value = out[:, self.chan_logit:, ...]
+        out_value = self.conv_value(out_value)
+        out_value = self.act_value(out_value)
+        flat_value = out_value.flatten(start_dim=1)
+        flat_value = self.lin_value(flat_value)
+        flat_value = torch.tanh(flat_value)
+
+        state_value = flat_value.squeeze(-1)
+
+        return logit, state_value
+
+
 class CoreModelBihary02(nn.Module):
     def __init__(self, args: dict, cen_main, dir_main, cen_resi, dir_resi, num_blocks=3):
         super().__init__()
@@ -68,16 +118,15 @@ class CoreModelBihary02(nn.Module):
         self.board_size = args.get('board_size')
         self.action_size = self.board_size ** 2
         self.win_length = args.get('win_length')
-
         # Input formatting layer
-        self.format_input = InputBihary02(cen_main, dir_main)
-
-        # Residual Tower (Flexible number of residual blocks)
+        self.format_input = InputBihary02(cen_out=cen_main, dir_out=dir_main)
+        # Residual Tower with flexible number of residual blocks
         self.residual_tower = nn.Sequential(
             *[ResBlockBihary02(cen_main=cen_main, dir_main=dir_main,
                                cen_resi=cen_resi, dir_resi=dir_resi,
-                               cen_k=3, dir_k=5) for _ in range(num_blocks)]
-        )
+                               cen_k=3, dir_k=5) for _ in range(num_blocks)])
+        # Output formatting layer
+        self.format_output = OutputBihary02(cen_in=cen_main, dir_in=dir_main)
 
         self.to(self.device)
 
@@ -85,48 +134,11 @@ class CoreModelBihary02(nn.Module):
     def forward(self, encoded):
         x = self.format_input(encoded)
         x = self.residual_tower(x)  # Pass through the residual tower
-        return x, x
+        logit, state_value = self.format_output(x)
+        logit += (encoded[0][:, 0, ...].flatten(start_dim=1) - 1.0) * 999.9
 
+        return logit, state_value
 
-# class CoreModelBihary02(nn.Module):
-#     def __init__(self, args: dict, cen_main, dir_main, cen_resi, dir_resi):
-#         super().__init__()
-#         self.args = args
-#         self.device = args.get('CUDA_device')
-#         self.board_size = args.get('board_size')
-#         self.action_size = self.board_size ** 2
-#         self.win_length = args.get('win_length')
-#
-#         self.format_input = InputBihary02(cen_main, dir_main)
-#
-#         self.res_block1 = ResBlockBihary02(cen_main=cen_main, dir_main=dir_main,
-#                                            cen_resi=cen_resi, dir_resi=dir_resi,
-#                                            cen_k=3, dir_k=5)
-#
-#         self.res_block2 = ResBlockBihary02(cen_main=cen_main, dir_main=dir_main,
-#                                            cen_resi=cen_resi, dir_resi=dir_resi,
-#                                            cen_k=3, dir_k=5)
-#
-#         self.res_block3 = ResBlockBihary02(cen_main=cen_main, dir_main=dir_main,
-#                                            cen_resi=cen_resi, dir_resi=dir_resi,
-#                                            cen_k=3, dir_k=5)
-#
-#         self.to(self.device)
-#
-#     @profile
-#     def forward(self, encoded):
-#         x = self.format_input(encoded)
-#         x = self.res_block1(x)
-#         x = self.res_block2(x)
-#         x = self.res_block3(x)
-#         return x
-#
-#         # # free_space = encoded[0][:, 0, ...]
-#         # # logit, state_value = self.output_layer(point_x, free_space)
-#         #
-#         # logit, state_value = 42, 42
-#         #
-#         # return logit, state_value
 
 class FormatDirectionalInput(nn.Module):
     def __init__(self, combine=False):

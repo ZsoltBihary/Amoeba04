@@ -17,7 +17,7 @@ args = {
     'num_table': 2,
     'num_MC': 100,
     'num_moves': 5,
-    'eval_batch_size': 800,
+    'eval_batch_size': 400,
     # 'res_channels': 32,
     # 'hid_channels': 16,
     # 'num_res': 4,
@@ -28,7 +28,8 @@ args = {
 game = Amoeba(args)
 # core_model = CoreModelTrivial(args)
 # core_model = CoreModelSimple01(args)
-core_model = CoreModelBihary02(args, 24, 24, 8, 8, num_blocks=9)
+# core_model = CoreModelBihary01(args, 64, 32)
+core_model = CoreModelBihary02(args, 32, 32, 16, 16, num_blocks=9)
 model = Model(game, core_model)
 
 player = torch.ones(args.get('eval_batch_size'), dtype=torch.int32)

@@ -7,6 +7,32 @@ from line_profiler_pycharm import profile
 # For custom convolutional layers, implemented as nn.modules, see the file CustomLayers.py
 
 
+def directional_projection2d(input_tensor, cen2cen, par2cen, dia2cen):
+    """
+    Efficient projection from directional and central features to only the central feature subspace.
+
+    Args:
+        input_tensor (Tensor): (N, C_in, H, W), where C_in = c_size_in + 4 * d_size_in.
+        cen2cen (Tensor): (c_size_out, c_size_in)
+        par2cen (Tensor): (c_size_out, d_size_in)
+        dia2cen (Tensor): (c_size_out, d_size_in)
+
+    Returns:
+        Tensor: (N, c_size_out, H, W)  # **No directional outputs!**
+    """
+    N, C_in, H, W = input_tensor.shape
+    c_out, c_in = cen2cen.shape
+    d_in = par2cen.shape[1]  # Extract d_size_in
+
+    assert C_in == c_in + 4 * d_in, "Input channels must match c_in + 4 * d_in"
+    # Construct projection kernel: (c_out, c_in + 4*d_in)
+    projection_matrix = torch.cat([cen2cen, par2cen.repeat(1, 2), dia2cen.repeat(1, 2)], dim=1)
+    # Reshape to match conv2d expectations (out_channels, in_channels, 1, 1)
+    projection_matrix = projection_matrix[:, :, None, None]
+    # Apply 1x1 convolution for efficient projection
+    return F.conv2d(input_tensor, projection_matrix)
+
+
 @profile
 def directional_pointwise_conv2d(input_tensor, cen2cen, par2cen, dia2cen, cen2dir, dir2dir):
 
@@ -51,7 +77,7 @@ def directional_pointwise_conv2d(input_tensor, cen2cen, par2cen, dia2cen, cen2di
 
 
 if __name__ == "__main__":
-    N, c_in, c_out, d_in, d_out, board_size = 800, 16, 8, 16, 8, 11
+    N, c_in, c_out, d_in, d_out, board_size = 800, 16, 8, 16, 0, 11
     # Create a random input tensor with grouped channels
     inp_tensor = torch.randn(N, c_in + 4 * d_in, board_size, board_size)
     # Define mixing tensors (random initialization for testing)

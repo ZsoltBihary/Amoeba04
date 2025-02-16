@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from custom_convolutions import dir2dir_conv2d, dir2point_conv2d, point2dir_conv2d
-from custom_convolutions import directional_pointwise_conv2d, directional_depthwise_conv2d
+from custom_convolutions import directional_pointwise_conv2d, directional_depthwise_conv2d, directional_projection2d
 from line_profiler_pycharm import profile
 
 
@@ -16,6 +16,37 @@ class BatchNormReLU2D(nn.Module):
 
     def forward(self, x):
         return self.act(self.bn(x))
+
+
+class DirectionalProjection2D(nn.Module):
+    def __init__(self, cen_in, cen_out, dir_in):
+        """
+        Efficient projection layer for extracting only the central feature subspace.
+
+        Args:
+            cen_in (int): Number of input central feature channels.
+            cen_out (int): Number of output central feature channels.
+            dir_in (int): Number of input directional feature channels per direction.
+        """
+        super().__init__()
+
+        # Define only the required projection parameters
+        self.cen2cen = nn.Parameter(torch.empty(cen_out, cen_in))
+        self.par2cen = nn.Parameter(torch.empty(cen_out, dir_in))
+        self.dia2cen = nn.Parameter(torch.empty(cen_out, dir_in))
+
+        # Initialize parameters
+        self._initialize_parameters()
+
+    def _initialize_parameters(self):
+        """Initialize parameters using Kaiming initialization for stability."""
+        nn.init.kaiming_normal_(self.cen2cen, mode='fan_out', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.par2cen, mode='fan_out', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.dia2cen, mode='fan_out', nonlinearity='relu')
+
+    def forward(self, x):
+        """Applies the efficient projection operation."""
+        return directional_projection2d(x, self.cen2cen, self.par2cen, self.dia2cen)
 
 
 class DirectionalPointwiseConv2D(nn.Module):
@@ -127,27 +158,33 @@ class DirectionalSeparableConv2D(nn.Module):
 
 if __name__ == "__main__":
     N, H, W = 800, 15, 15
-    c_in, c_out, d_in, d_out = 32, 16, 32, 16
+    c_in, c_out, d_in, d_out = 32, 16, 24, 12
     c_k, d_k = 3, 5
     input_tensor = torch.randn(N, c_in + 4 * d_in, H, W)
 
-    print("=== Testing DirectionalDepthwiseConv2D ===")
+    print("\n=== Testing DirectionalDepthwiseConv2D ===")
     d_layer = DirectionalDepthwiseConv2D(c_in, d_in, c_k, d_k)
     d_output = d_layer(input_tensor)
     print("Input Shape:", input_tensor.shape)
     print("Output Shape:", d_output.shape)
 
-    print("=== Testing DirectionalPointwiseConv2D ===")
+    print("\n=== Testing DirectionalPointwiseConv2D ===")
     p_layer = DirectionalPointwiseConv2D(c_in, c_out, d_in, d_out)
     p_output = p_layer(d_output)
     print("Input Shape:", d_output.shape)
     print("Output Shape:", p_output.shape)
 
-    print("=== Testing DirectionalSeparableConv2D ===")
+    print("\n=== Testing DirectionalSeparableConv2D ===")
     s_layer = DirectionalSeparableConv2D(c_in, c_out, d_in, d_out, c_k, d_k)
     s_output = s_layer(input_tensor)
     print("Input Shape:", input_tensor.shape)
     print("Output Shape:", s_output.shape)
+
+    print("\n=== Testing DirectionalPointwiseConv2D ===")
+    pr_layer = DirectionalProjection2D(c_in, c_out, d_in)
+    pr_output = pr_layer(d_output)
+    print("Input Shape:", d_output.shape)
+    print("Output Shape:", pr_output.shape)
 
 
 class DirBatchNorm2D(nn.Module):
