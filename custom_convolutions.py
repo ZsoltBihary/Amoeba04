@@ -10,13 +10,11 @@ from line_profiler_pycharm import profile
 def directional_projection2d(input_tensor, cen2cen, par2cen, dia2cen):
     """
     Efficient projection from directional and central features to only the central feature subspace.
-
     Args:
         input_tensor (Tensor): (N, C_in, H, W), where C_in = c_size_in + 4 * d_size_in.
         cen2cen (Tensor): (c_size_out, c_size_in)
         par2cen (Tensor): (c_size_out, d_size_in)
         dia2cen (Tensor): (c_size_out, d_size_in)
-
     Returns:
         Tensor: (N, c_size_out, H, W)  # **No directional outputs!**
     """
@@ -35,12 +33,10 @@ def directional_projection2d(input_tensor, cen2cen, par2cen, dia2cen):
 
 @profile
 def directional_pointwise_conv2d(input_tensor, cen2cen, par2cen, dia2cen, cen2dir, dir2dir):
-
     """
     Pointwise convolution with proper nested stacking.
     Custom pointwise convolution that mixes isotropic features and directional features of the same type.
     Intergroup mixing also happens in a controlled and parameter-sharing fashion.
-
     Args:
         input_tensor (Tensor): (N, C_in, H, W), where C_in = c_size_in + 4 * d_size_in.
         cen2cen (Tensor): (c_size_out, c_size_in)
@@ -48,7 +44,6 @@ def directional_pointwise_conv2d(input_tensor, cen2cen, par2cen, dia2cen, cen2di
         dia2cen (Tensor): (c_size_out, d_size_in)
         cen2dir (Tensor): (d_size_out, c_size_in)
         dir2dir (Tensor): (d_size_out, d_size_in)
-
     Returns:
         Tensor: (N, C_out, H, W), where C_out = c_size_out + 4 * d_size_out.
     """
@@ -97,12 +92,10 @@ def directional_depthwise_conv2d(input_tensor, cen_tensor, dir_tensor):
     """
     Custom depthwise convolution with filters for isotropic features, and with
     directional filters that are shared across horizontal, vertical, diagonal, and anti-diagonal features.
-
     Args:
         input_tensor (Tensor): Input tensor of shape (N, C_in, H, W), where C_in = cen_size + 4 * dir_size.
         cen_tensor (Tensor): Kernel tensor for central features, shape (cen_size, cen_k, cen_k).
         dir_tensor (Tensor): Kernel tensor for directional features, shape (dir_size, dir_k).
-
     Returns:
         output_tensor (Tensor): Output tensor of the same shape as input (N, C_in, H, W).
     """

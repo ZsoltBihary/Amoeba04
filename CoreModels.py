@@ -1,15 +1,190 @@
 import torch
 import torch.nn as nn
-# import torch.nn.functional as F
-# from CustomLayers import (Dir2DirSum, Dir2PointConv2D, Point2DirConv2D, Dir2DirConv2D,
-#                           DepthwiseSeparableConv2D, DirBatchNorm2D)
+import torch.nn.functional as F
 from CustomLayers import (Dir2DirSum, Dir2PointConv2D, Dir2DirConv2D,
                           DepthwiseSeparableConv2D, DirBatchNorm2D)
-# from CustomLayers import DirectionalPointwiseConv2D, DirectionalDepthwiseConv2D, DirectionalSeparableConv2D
-from CustomLayers import DirectionalPointwiseConv2D, DirectionalSeparableConv2D, DirectionalProjection2D
+from CustomLayers import (DirectionalPointwiseConv2D, DirectionalDepthwiseConv2D,
+                          DirectionalSeparableConv2D, DirectionalProjection2D)
 from CustomLayers import BatchNormReLU2D
-
 from line_profiler_pycharm import profile
+
+
+class InputBihary03(nn.Module):
+    def __init__(self, cen_main, dir_main):
+        super().__init__()
+        chan_main = cen_main + 4 * dir_main
+        self.pointwise = DirectionalPointwiseConv2D(cen_in=3, cen_out=cen_main, dir_in=9, dir_out=dir_main)
+        self.bnr = BatchNormReLU2D(num_features=chan_main)
+        self.depthwise = DirectionalDepthwiseConv2D(cen_in=cen_main, dir_in=dir_main, cen_k=3, dir_k=5)
+
+    @profile
+    def forward(self, encoded):
+        point_encoded, dir_encoded = encoded
+        # point_encoded: Tensor(N, 3, board_size, board_size)
+        # dir_encoded: Tensor(N, 4, 11, board_size, board_size)
+        dir_encoded = dir_encoded[:, :, 1: -1, :, :]
+        # dir_encoded: Tensor(N, 4, 9, board_size, board_size)
+        # reshape by stacking the 4 directions into a grouped channel dimension ...
+        new_shape = (dir_encoded.shape[0], dir_encoded.shape[1] * dir_encoded.shape[2],
+                     dir_encoded.shape[3], dir_encoded.shape[4])
+        dir_encoded = dir_encoded.reshape(new_shape)
+        # dir_encoded: Tensor(N, 36, board_size, board_size)
+        x = torch.cat([point_encoded, dir_encoded], dim=1)
+        # x: Tensor(N, 39, board_size, board_size)
+        x = self.pointwise(x)
+        x = self.bnr(x)
+        x = self.depthwise(x)
+
+        return x
+
+
+# OutputBihary03(cen_in=cen_main, dir_in=dir_main, ch_pol, ch_val, mul_att)
+
+class OutputBihary03(nn.Module):
+    def __init__(self, cen_in, dir_in, ch_val, mul_att):
+        super().__init__()
+        self.chan_val = ch_val
+        self.mul_att = mul_att
+        chan_main = cen_in + 4*dir_in
+        self.bnr1 = BatchNormReLU2D(num_features=chan_main)
+        # self.conv = nn.Conv2d(in_channels=num_in, out_channels=3,
+        #                       kernel_size=kernel_size, padding=kernel_size // 2, bias=True)
+        chan_out = ch_val + mul_att + 1
+        self.project = DirectionalProjection2D(cen_in=cen_in, cen_out=chan_out, dir_in=dir_in)
+        self.bnr2 = BatchNormReLU2D(num_features=ch_val)
+        self.point_val = nn.Conv2d(in_channels=ch_val, out_channels=mul_att, kernel_size=1)
+        self.head_combine = nn.Linear(mul_att, 1)
+        # Residual coupling from attention_logit → policy_logit
+        self.alpha = nn.Parameter(torch.tensor(0.1))  # Learnable scaling factor
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+        x = self.bnr1(x)
+        x = self.project(x)
+        out_val = x[:, :self.chan_val, ...]
+        out_att = x[:, self.chan_val: -1, ...]
+        out_pol = x[:, -1:, ...]
+        # out_att += out_pol
+        out_val = self.bnr2(out_val)
+        out_val = self.point_val(out_val)
+
+        # Compute policy logits
+        policy_logit = out_pol.view(batch_size, -1)  # (batch, b^2)
+
+        # Compute attention logits
+        attention_logit = out_att.view(batch_size, self.mul_att, -1)  # (batch, heads, b^2)
+        attention = F.softmax(attention_logit, dim=-1)  # Normalize across board positions
+
+        # Compute space values
+        space_value = out_val.view(batch_size, self.mul_att, -1)  # (batch, heads, b^2)
+
+        # Compute per-head state values
+        state_values_per_head = torch.sum(attention * space_value, dim=-1)  # (batch, heads)
+
+        # Aggregate across heads
+        state_value = torch.tanh(self.head_combine(state_values_per_head).squeeze(-1))  # (batch,)
+
+        # Residual connection: Inject attention importance into policy logit
+        policy_logit = policy_logit + self.alpha * attention_logit.mean(dim=1)  # (batch, b^2)
+
+        return policy_logit, state_value
+
+
+class CoreModelBihary03(nn.Module):
+    def __init__(self, args: dict, cen_main, dir_main, cen_resi, num_blocks, ch_val, mul_att):
+        super().__init__()
+        self.args = args
+        self.device = args.get('CUDA_device')
+        self.board_size = args.get('board_size')
+        self.action_size = self.board_size ** 2
+        self.win_length = args.get('win_length')
+        # Input formatting layer
+        self.format_input = InputBihary03(cen_main=cen_main, dir_main=dir_main)
+        # Residual Tower with flexible number of residual blocks
+        # self.residual_tower = nn.Sequential(
+        #     *[ResBlockBihary02(cen_main=cen_main, dir_main=dir_main,
+        #                        cen_resi=cen_resi, dir_resi=dir_resi,
+        #                        cen_k=3, dir_k=5) for _ in range(num_blocks)])
+        # Output formatting layer
+        # cen_in, dir_in, ch_val, mul_att
+        self.format_output = OutputBihary03(cen_in=cen_main, dir_in=dir_main,
+                                            ch_val=ch_val, mul_att=mul_att)
+        self.to(self.device)
+
+    @profile
+    def forward(self, encoded):
+        x = self.format_input(encoded)
+        # x = self.residual_tower(x)  # Pass through the residual tower
+        logit, state_value = self.format_output(x)
+        logit += (encoded[0][:, 0, ...].flatten(start_dim=1) - 1.0) * 999.9
+
+        return logit, state_value
+
+
+class FormatDirectionalInput(nn.Module):
+    def __init__(self, combine=False):
+        super().__init__()
+        self.combine = combine
+
+    def forward(self, encoded):
+        point_encoded, dir_encoded = encoded
+        # point_encoded: Tensor(N, 3, board_size, board_size)
+        # dir_encoded: Tensor(N, 4, 11, board_size, board_size)
+        dir_encoded = dir_encoded[:, :, 1: -1, :, :]
+        # dir_encoded: Tensor(N, 4, 9, board_size, board_size)
+        if self.combine:
+            dir_encoded = torch.cat([point_encoded.unsqueeze(1).repeat(1, 4, 1, 1, 1), dir_encoded], dim=2)
+        # reshape by stacking the 4 directions into a grouped channel dimension ...
+        new_shape = (dir_encoded.shape[0], dir_encoded.shape[1] * dir_encoded.shape[2],
+                     dir_encoded.shape[3], dir_encoded.shape[4])
+        dir_input = dir_encoded.reshape(new_shape)
+
+        return dir_input
+
+
+class CoreModelSimple01(nn.Module):
+    def __init__(self, args: dict):
+        super().__init__()
+        self.args = args
+        self.device = args.get('CUDA_device')
+        self.board_size = args.get('board_size')
+        self.action_size = self.board_size ** 2
+        self.win_length = args.get('win_length')
+
+        self.format_dir_input = FormatDirectionalInput(combine=False)
+
+        self.line_type_size = 2 * self.win_length - 1
+        self.sum_lines = Dir2DirSum(self.line_type_size, self.win_length, self.device)
+
+        logit_par = [18.17, 6.13, 1.98, 0.45, -0.02, 0.89, 2.49, 8.43, 23.64]
+        value_par = [-1.37, -0.11, -0.07, -0.05, 0.0, 0.04, 0.07, 0.27, 3.05]
+
+        weight_kernel = torch.tensor([logit_par, value_par], dtype=torch.float32).unsqueeze(2).repeat(1, 1, 5)
+
+        self.weight_conv = Dir2PointConv2D(in_channels_per_dir=self.line_type_size,
+                                           out_channels=2,
+                                           kernel_size=self.win_length,
+                                           para_kernel_init=weight_kernel,
+                                           diag_kernel_init=weight_kernel)
+
+        self.to(self.device)
+
+    @profile
+    def forward(self, encoded):
+        point_encoded, dir_encoded = encoded
+        dir_input = self.format_dir_input(encoded)
+        sum_input = self.sum_lines(dir_input)
+        output = self.weight_conv(sum_input)
+        # So far so good ...
+        logit = output[:, 0, ...] + 999.0 * (point_encoded[:, 0, ...] - 1.0)
+        logit = logit.reshape(logit.shape[0], -1)
+        attention = torch.softmax(logit, dim=1)
+        value = output[:, 1, ...]
+        value = value.reshape(logit.shape[0], -1)
+        state_value = torch.einsum('ij,ij->i', attention, value)
+        state_value = torch.tanh(state_value)
+
+        return logit, state_value
 
 
 class InputBihary02(nn.Module):
@@ -138,31 +313,6 @@ class CoreModelBihary02(nn.Module):
         logit += (encoded[0][:, 0, ...].flatten(start_dim=1) - 1.0) * 999.9
 
         return logit, state_value
-
-
-class FormatDirectionalInput(nn.Module):
-    def __init__(self, combine=False):
-        super().__init__()
-        self.combine = combine
-        # self.device = args.get('CUDA_device')
-        # self.board_size = args.get('board_size')
-        # self.action_size = self.board_size ** 2
-        # self.to(self.device)
-
-    def forward(self, encoded):
-        point_encoded, dir_encoded = encoded
-        # point_encoded: Tensor(N, 3, board_size, board_size)
-        # dir_encoded: Tensor(N, 4, 11, board_size, board_size)
-        dir_encoded = dir_encoded[:, :, 1: -1, :, :]
-        # dir_encoded: Tensor(N, 4, 9, board_size, board_size)
-        if self.combine:
-            dir_encoded = torch.cat([point_encoded.unsqueeze(1).repeat(1, 4, 1, 1, 1), dir_encoded], dim=2)
-        # reshape by stacking the 4 directions into a grouped channel dimension ...
-        new_shape = (dir_encoded.shape[0], dir_encoded.shape[1] * dir_encoded.shape[2],
-                     dir_encoded.shape[3], dir_encoded.shape[4])
-        dir_input = dir_encoded.reshape(new_shape)
-
-        return dir_input
 
 
 class InputBihary01(nn.Module):
@@ -328,51 +478,6 @@ class CoreModelBihary01(nn.Module):
 
         free_space = encoded[0][:, 0, ...]
         logit, state_value = self.output_layer(point_x, free_space)
-
-        return logit, state_value
-
-
-class CoreModelSimple01(nn.Module):
-    def __init__(self, args: dict):
-        super().__init__()
-        self.args = args
-        self.device = args.get('CUDA_device')
-        self.board_size = args.get('board_size')
-        self.action_size = self.board_size ** 2
-        self.win_length = args.get('win_length')
-
-        self.format_dir_input = FormatDirectionalInput(combine=False)
-
-        self.line_type_size = 2 * self.win_length - 1
-        self.sum_lines = Dir2DirSum(self.line_type_size, self.win_length, self.device)
-
-        logit_par = [18.17, 6.13, 1.98, 0.45, -0.02, 0.89, 2.49, 8.43, 23.64]
-        value_par = [-1.37, -0.11, -0.07, -0.05, 0.0, 0.04, 0.07, 0.27, 3.05]
-
-        weight_kernel = torch.tensor([logit_par, value_par], dtype=torch.float32).unsqueeze(2).repeat(1, 1, 5)
-
-        self.weight_conv = Dir2PointConv2D(in_channels_per_dir=self.line_type_size,
-                                           out_channels=2,
-                                           kernel_size=self.win_length,
-                                           para_kernel_init=weight_kernel,
-                                           diag_kernel_init=weight_kernel)
-
-        self.to(self.device)
-
-    @profile
-    def forward(self, encoded):
-        point_encoded, dir_encoded = encoded
-        dir_input = self.format_dir_input(encoded)
-        sum_input = self.sum_lines(dir_input)
-        output = self.weight_conv(sum_input)
-        # So far so good ...
-        logit = output[:, 0, ...] + 999.0 * (point_encoded[:, 0, ...] - 1.0)
-        logit = logit.reshape(logit.shape[0], -1)
-        attention = torch.softmax(logit, dim=1)
-        value = output[:, 1, ...]
-        value = value.reshape(logit.shape[0], -1)
-        state_value = torch.einsum('ij,ij->i', attention, value)
-        state_value = torch.tanh(state_value)
 
         return logit, state_value
 
