@@ -1,6 +1,6 @@
 import torch
 from Amoeba import Amoeba
-from CoreModels import CoreModelTrivial, CoreModelSimple01, CoreModelBihary01, CoreModelBihary02
+from CoreModels import CoreModelTrivial, CoreModelSimple01, CoreModelBihary01, CoreModelBihary02, CoreModelBihary03
 from Model import Model
 from SearchEngine import SearchEngine
 # from torchinfo import summary
@@ -12,15 +12,15 @@ args = {
     'board_size': 15,
     'win_length': 5,
     'CUDA_device': 'cuda' if torch.cuda.is_available() else 'cpu',
-    'num_MC': 50000,
-    'num_child': 50,
+    'num_MC': 8000,
+    'num_child': 100,
     'num_table': 1,
-    'num_agent': 100,
+    'num_agent': 20,
     'leaf_buffer_capacity': 6000,
-    'eval_batch_size': 100,
-    'num_moves': 10,
+    'eval_batch_size': 16,
+    'num_moves': 250,
     'trainer_buffer_capacity': 100000,
-    'agent_multi': 20,
+    'agent_multi': 8,
     'symmetry_used': True
     # 'split_depth': 0,
     # 'res_channels': 32,
@@ -32,14 +32,18 @@ args = {
 
 game = Amoeba(args)
 # core_model = CoreModelTrivial(args)
-core_model = CoreModelSimple01(args)
+# core_model = CoreModelSimple01(args)
 # core_model = CoreModelBihary01(args, 64, 32)
 # core_model = CoreModelBihary02(args, 16, 16, 8, 8, num_blocks=4)
 # core_model = CoreModelBihary02(args, 32, 32, 16, 16, num_blocks=9)
+core_model = CoreModelBihary03(args, cen_main=32, dir_main=24,
+                               cen_resi=12, num_blocks=0,
+                               ch_val=8, mul_att=3
+                               )
 model = Model(game, core_model)
 # Load the state dictionary from the file
-state_dict = torch.load('savedModels/Simple01_02_01.pth')
-# state_dict = torch.load('savedModels/Bihary02_02_02.pth')
+# state_dict = torch.load('savedModels/Simple01_02_01.pth')
+state_dict = torch.load('savedModels/Bihary03_03_10.pth')
 # Load the state dictionary into the model
 model.load_state_dict(state_dict)
 model.cuda()

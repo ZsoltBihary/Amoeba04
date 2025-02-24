@@ -33,9 +33,9 @@ game = Amoeba(args)
 # args: dict, cen_main, dir_main,
 # cen_resi, num_blocks,
 # ch_val, mul_att):
-core_model = CoreModelBihary03(args, cen_main=16, dir_main=16,
-                               cen_resi=8, num_blocks=0,
-                               ch_val=8, mul_att=2
+core_model = CoreModelBihary03(args, cen_main=32, dir_main=24,
+                               cen_resi=12, num_blocks=0,
+                               ch_val=8, mul_att=3
                                )
 model = Model(game, core_model)
 
@@ -49,6 +49,6 @@ state_CUDA = (player.view(-1, 1) * position).to(dtype=torch.float32, device=args
 # print(logit_int)
 # print(state_value[0])
 
-# summary(model, input_data=state_CUDA, verbose=2)
+summary(model, input_data=state_CUDA, verbose=2)
 
 summary(model, input_data=state_CUDA, verbose=1)

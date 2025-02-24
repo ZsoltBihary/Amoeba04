@@ -63,8 +63,8 @@ class AlphaZero:
         self.next_move_idx = torch.zeros(self.num_table, dtype=torch.long)
         # Precalculate how many best moves are considered ...
         self.k_move_select = torch.ones(self.max_move_idx, dtype=torch.int32)
-        self.k_move_select[: 10] = 5
-        self.k_move_select[: 5] = 25
+        self.k_move_select[: 10] = 3
+        self.k_move_select[: 5] = 20
         self.all_table = torch.arange(self.num_table)
         self.player = torch.zeros(self.num_table, dtype=torch.int32)
         self.position = torch.zeros((self.num_table, self.position_size), dtype=torch.int32)
@@ -96,7 +96,7 @@ class AlphaZero:
         # Compute iteratively going backwards
         for t in range(len(value) - 2, -1, -1):  # Start from the second-to-last element
             av_value[t] = alpha * value[t] + (1 - alpha) * av_value[t + 1]
-        memory = 100.0
+        memory = 50.0
         beta = 0.9
         w_result = memory / (memory + len(value) - torch.arange(len(value)))
         w_av_value = (1.0 - w_result) * beta
@@ -151,7 +151,7 @@ class AlphaZero:
                 move_action = torch.argmax(policy)
             else:
                 best_pol, best_actions = torch.topk(policy, k)
-                best_pol = best_pol ** (2.0 / k)
+                # best_pol = best_pol ** (2.0 / k)  # TODO: Why do we have this here ???
                 best_probs = best_pol / torch.sum(best_pol)
                 idx = torch.multinomial(best_probs, num_samples=1)
                 move_action = best_actions[idx]
@@ -184,7 +184,7 @@ class AlphaZero:
                   f"  Buffer size: {len(self.trainer_buffer)}",
                   f"  Data count: {self.trainer_buffer.data_count}")
 
-            if self.trainer_buffer.data_count > self.trainer_buffer_capacity // 5:
+            if self.trainer_buffer.data_count > self.trainer_buffer_capacity // 8:
                 print('Training begins ...')
                 self.trainer.improve_model(mini_batch=64, epochs=10)
                 # for name, param in self.model.named_parameters():

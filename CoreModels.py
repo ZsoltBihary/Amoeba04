@@ -47,15 +47,13 @@ class OutputBihary03(nn.Module):
         self.mul_att = mul_att
         chan_main = cen_in + 4*dir_in
         self.bnr1 = BatchNormReLU2D(num_features=chan_main)
-        # self.conv = nn.Conv2d(in_channels=num_in, out_channels=3,
-        #                       kernel_size=kernel_size, padding=kernel_size // 2, bias=True)
         chan_out = ch_val + mul_att + 1
         self.project = DirectionalProjection2D(cen_in=cen_in, cen_out=chan_out, dir_in=dir_in)
         self.bnr2 = BatchNormReLU2D(num_features=ch_val)
         self.point_val = nn.Conv2d(in_channels=ch_val, out_channels=mul_att, kernel_size=1)
         self.head_combine = nn.Linear(mul_att, 1)
         # Residual coupling from attention_logit → policy_logit
-        self.alpha = nn.Parameter(torch.tensor(0.1))  # Learnable scaling factor
+        self.alpha = nn.Parameter(torch.tensor(1.0))  # Learnable scaling factor
 
     def forward(self, x):
         batch_size = x.shape[0]
@@ -64,7 +62,6 @@ class OutputBihary03(nn.Module):
         out_val = x[:, :self.chan_val, ...]
         out_att = x[:, self.chan_val: -1, ...]
         out_pol = x[:, -1:, ...]
-        # out_att += out_pol
         out_val = self.bnr2(out_val)
         out_val = self.point_val(out_val)
 
